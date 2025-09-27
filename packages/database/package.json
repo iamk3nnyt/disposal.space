@@ -1,0 +1,35 @@
+{
+  "name": "@ketryon/database",
+  "version": "2.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx src/seed.ts",
+    "db:seed-mvp": "tsx src/seed-mvp.ts",
+    "db:seed-budget-website": "tsx src/seed-budget-website.ts",
+    "db:seed-saas-tools": "tsx src/seed-saas-tools.ts",
+    "db:seed-hiring-developer": "tsx src/seed-hiring-developer.ts",
+    "db:seed-custom-web-app": "tsx src/seed-custom-web-app.ts",
+    "db:seed-mvp-timeline": "tsx src/seed-mvp-timeline.ts",
+    "db:seed-website-features": "tsx src/seed-website-features.ts",
+    "db:seed-all": "tsx src/seed-all.ts"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.3",
+    "drizzle-orm": "^0.44.3",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "drizzle-kit": "^0.31.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
