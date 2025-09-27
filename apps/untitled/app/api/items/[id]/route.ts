@@ -238,7 +238,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/items/[id] - Delete item (soft delete)
+// DELETE /api/items/[id] - Delete item permanently
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -259,8 +259,6 @@ export async function DELETE(
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
-    const searchParams = request.nextUrl.searchParams;
-    const permanent = searchParams.get("permanent") === "true";
     const { id } = await params;
 
     // Get the item to delete
@@ -276,72 +274,51 @@ export async function DELETE(
 
     let totalSizeFreed = 0;
 
-    if (permanent) {
-      // Permanent deletion - remove from database AND S3
-      if (existingItem.type === "folder") {
-        // Get all descendants and calculate total size
-        const descendants = await getAllDescendants(id, user.id);
-        totalSizeFreed = descendants
-          .filter((item) => item.type === "file")
-          .reduce((sum, item) => sum + item.sizeBytes, 0);
+    // Permanent deletion - remove from database AND S3
+    if (existingItem.type === "folder") {
+      // Get all descendants and calculate total size
+      const descendants = await getAllDescendants(id, user.id);
+      totalSizeFreed = descendants
+        .filter((item) => item.type === "file")
+        .reduce((sum, item) => sum + item.sizeBytes, 0);
 
-        // Delete all descendant files from S3 first
-        for (const descendant of descendants) {
-          if (descendant.type === "file" && descendant.filePath) {
-            try {
-              await fileProcessor.deleteFile(descendant.filePath);
-            } catch (error) {
-              console.error(
-                `Failed to delete file from S3: ${descendant.filePath}`,
-                error,
-              );
-              // Continue with database deletion even if S3 deletion fails
-            }
-          }
-        }
-
-        // Delete all descendants from database
-        for (const descendant of descendants) {
-          await db.delete(items).where(eq(items.id, descendant.id));
-        }
-      } else if (existingItem.type === "file") {
-        // Delete single file from S3 first
-        if (existingItem.filePath) {
+      // Delete all descendant files from S3 first
+      for (const descendant of descendants) {
+        if (descendant.type === "file" && descendant.filePath) {
           try {
-            await fileProcessor.deleteFile(existingItem.filePath);
+            await fileProcessor.deleteFile(descendant.filePath);
           } catch (error) {
             console.error(
-              `Failed to delete file from S3: ${existingItem.filePath}`,
+              `Failed to delete file from S3: ${descendant.filePath}`,
               error,
             );
             // Continue with database deletion even if S3 deletion fails
           }
         }
-        totalSizeFreed = existingItem.sizeBytes;
       }
 
-      // Delete the item itself from database
-      await db.delete(items).where(eq(items.id, id));
-    } else {
-      // Soft delete - mark as deleted
-      if (existingItem.type === "folder") {
-        // Get all descendants and mark them as deleted
-        const descendants = await getAllDescendants(id, user.id);
-
-        for (const descendant of descendants) {
-          await db
-            .update(items)
-            .set({ isDeleted: true, deletedAt: new Date() })
-            .where(eq(items.id, descendant.id));
+      // Delete all descendants from database
+      for (const descendant of descendants) {
+        await db.delete(items).where(eq(items.id, descendant.id));
+      }
+    } else if (existingItem.type === "file") {
+      // Delete single file from S3 first
+      if (existingItem.filePath) {
+        try {
+          await fileProcessor.deleteFile(existingItem.filePath);
+        } catch (error) {
+          console.error(
+            `Failed to delete file from S3: ${existingItem.filePath}`,
+            error,
+          );
+          // Continue with database deletion even if S3 deletion fails
         }
       }
-
-      // Mark the item itself as deleted
-      await db
-        .update(items)
-        .set({ isDeleted: true, deletedAt: new Date() })
-        .where(eq(items.id, id));
+      totalSizeFreed = existingItem.sizeBytes;
     }
+
+    // Delete the item itself from database
+    await db.delete(items).where(eq(items.id, id));
 
     // Update user's storage if any files were deleted
     if (totalSizeFreed > 0) {
@@ -352,7 +329,7 @@ export async function DELETE(
     }
 
     return NextResponse.json({
-      message: `Item ${permanent ? "permanently deleted" : "moved to trash"} successfully`,
+      message: "Item deleted successfully",
       sizeFreed: totalSizeFreed,
     });
   } catch (error) {

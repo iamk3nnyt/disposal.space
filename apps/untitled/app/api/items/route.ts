@@ -117,7 +117,351 @@ async function handleFolderCreation(request: NextRequest, user: SelectUser) {
   });
 }
 
-// Helper function to handle file upload
+// SSE Event types for categorized events
+interface SSEEvent {
+  category: "upload" | "delete" | "move" | "rename";
+  type: "progress" | "completed" | "error";
+  data: {
+    progress?: number;
+    phase?: string;
+    message: string;
+    itemId?: string;
+    fileName?: string;
+    totalFiles?: number;
+    processedFiles?: number;
+    currentFile?: string;
+    totalSize?: number;
+  };
+}
+
+// Helper function to handle file upload with SSE streaming
+async function handleFileUploadWithSSE(
+  request: NextRequest,
+  user: SelectUser,
+  clerkUserId: string,
+) {
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+
+      // Send SSE event helper
+      const sendSSEEvent = (event: SSEEvent) => {
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
+        );
+      };
+
+      try {
+        // Parse form data
+        const formData = await request.formData();
+        const files = formData.getAll("files") as File[];
+        const parentId = formData.get("parentId") as string | null;
+
+        if (!files || files.length === 0) {
+          sendSSEEvent({
+            category: "upload",
+            type: "error",
+            data: { message: "No files provided" },
+          });
+          controller.close();
+          return;
+        }
+
+        const uploadResults = [];
+        let totalSize = 0;
+
+        // Create a map to store created folders to avoid duplicates
+        const createdFolders = new Map<string, string>();
+
+        // Helper function to create folder hierarchy
+        const createFolderHierarchy = async (
+          relativePath: string,
+          userId: string,
+          rootParentId: string | null,
+        ): Promise<string | null> => {
+          const pathParts = relativePath
+            .split("/")
+            .filter((part) => part.length > 0);
+
+          // If no path parts, return the root parent
+          if (pathParts.length === 0) return rootParentId;
+
+          // Remove the filename (last part) to get folder path
+          const folderParts = pathParts.slice(0, -1);
+          if (folderParts.length === 0) return rootParentId;
+
+          let currentParentId = rootParentId;
+          let currentPath = "";
+
+          for (const folderName of folderParts) {
+            currentPath = currentPath
+              ? `${currentPath}/${folderName}`
+              : folderName;
+
+            // Check if we already created this folder
+            if (createdFolders.has(currentPath)) {
+              currentParentId = createdFolders.get(currentPath)!;
+              continue;
+            }
+
+            // Check if folder already exists in database
+            const [existingFolder] = await db
+              .select()
+              .from(items)
+              .where(
+                and(
+                  eq(items.userId, userId),
+                  currentParentId
+                    ? eq(items.parentId, currentParentId)
+                    : isNull(items.parentId),
+                  eq(items.name, folderName),
+                  eq(items.type, "folder"),
+                  eq(items.isDeleted, false),
+                ),
+              )
+              .limit(1);
+
+            if (existingFolder) {
+              currentParentId = existingFolder.id;
+              createdFolders.set(currentPath, existingFolder.id);
+            } else {
+              // Create new folder
+              const [newFolder] = await db
+                .insert(items)
+                .values({
+                  userId,
+                  parentId: currentParentId,
+                  name: folderName,
+                  type: "folder",
+                  sizeBytes: 0,
+                })
+                .returning();
+
+              currentParentId = newFolder.id;
+              createdFolders.set(currentPath, newFolder.id);
+            }
+          }
+
+          return currentParentId;
+        };
+
+        // Send initial progress
+        sendSSEEvent({
+          category: "upload",
+          type: "progress",
+          data: {
+            phase: "validation",
+            message: "Validating files...",
+            progress: 5,
+            totalFiles: files.length,
+            processedFiles: 0,
+          },
+        });
+
+        // Process each file
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+
+          try {
+            // Check storage limit before processing
+            if (user.storageUsed + file.size > user.storageLimit) {
+              sendSSEEvent({
+                category: "upload",
+                type: "error",
+                data: {
+                  message: `Storage limit exceeded. File "${file.name}" would exceed your ${Math.round(user.storageLimit / (1024 * 1024 * 1024))}GB limit.`,
+                },
+              });
+              controller.close();
+              return;
+            }
+
+            // Progress: File validation
+            const baseProgress = (i / files.length) * 80; // Reserve 80% for file processing
+            sendSSEEvent({
+              category: "upload",
+              type: "progress",
+              data: {
+                phase: "processing",
+                message: `Processing ${file.name}...`,
+                progress: baseProgress + 10,
+                totalFiles: files.length,
+                processedFiles: i,
+                currentFile: file.name,
+              },
+            });
+
+            // Get the relative path from webkitdirectory uploads
+            const relativePath =
+              (file as File & { webkitRelativePath?: string })
+                .webkitRelativePath || file.name;
+
+            // Create folder hierarchy if needed
+            const fileParentId = await createFolderHierarchy(
+              relativePath,
+              user.id,
+              parentId,
+            );
+
+            // Convert File to Buffer
+            const arrayBuffer = await file.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+
+            // Progress: S3 upload
+            sendSSEEvent({
+              category: "upload",
+              type: "progress",
+              data: {
+                phase: "uploading",
+                message: `Uploading ${file.name} to cloud storage...`,
+                progress: baseProgress + 30,
+                totalFiles: files.length,
+                processedFiles: i,
+                currentFile: file.name,
+              },
+            });
+
+            // Upload to S3 with validation and security scanning
+            const uploadResult = await fileProcessor.uploadAndProcess(
+              buffer,
+              file.name,
+              clerkUserId,
+            );
+
+            // Progress: Database operations
+            sendSSEEvent({
+              category: "upload",
+              type: "progress",
+              data: {
+                phase: "finalizing",
+                message: `Finalizing ${file.name}...`,
+                progress: baseProgress + 60,
+                totalFiles: files.length,
+                processedFiles: i,
+                currentFile: file.name,
+              },
+            });
+
+            // Determine file type for database
+            const fileExtension = getFileExtension(file.name);
+            const fileCategory = getFileTypeCategory(file.name);
+
+            // Create database record
+            const [newItem] = await db
+              .insert(items)
+              .values({
+                userId: user.id,
+                parentId: fileParentId,
+                name: file.name,
+                type: "file",
+                fileType: fileExtension,
+                sizeBytes: file.size,
+                mimeType: uploadResult.mimeType,
+                filePath: uploadResult.key, // Store S3 key for future operations
+              })
+              .returning();
+
+            totalSize += file.size;
+
+            uploadResults.push({
+              file: formatItemForFrontend(newItem),
+              s3Key: uploadResult.key,
+              s3Url: uploadResult.url,
+              category: fileCategory,
+              size: file.size,
+              mimeType: uploadResult.mimeType,
+            });
+
+            // Progress: File completed
+            sendSSEEvent({
+              category: "upload",
+              type: "progress",
+              data: {
+                phase: "completed",
+                message: `${file.name} completed successfully`,
+                progress: ((i + 1) / files.length) * 80,
+                totalFiles: files.length,
+                processedFiles: i + 1,
+                currentFile: file.name,
+              },
+            });
+          } catch (fileError) {
+            console.error(`Error processing file ${file.name}:`, fileError);
+
+            sendSSEEvent({
+              category: "upload",
+              type: "error",
+              data: {
+                message: `Failed to process ${file.name}: ${fileError instanceof Error ? fileError.message : "Unknown error"}`,
+              },
+            });
+            controller.close();
+            return;
+          }
+        }
+
+        // Final progress: Updating storage
+        sendSSEEvent({
+          category: "upload",
+          type: "progress",
+          data: {
+            phase: "finalizing",
+            message: "Updating storage usage...",
+            progress: 95,
+            totalFiles: files.length,
+            processedFiles: files.length,
+          },
+        });
+
+        // Update user's storage usage
+        await db
+          .update(users)
+          .set({
+            storageUsed: user.storageUsed + totalSize,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, user.id));
+
+        // Complete progress session
+        sendSSEEvent({
+          category: "upload",
+          type: "completed",
+          data: {
+            message: `${uploadResults.length} file(s) uploaded successfully`,
+            progress: 100,
+            totalFiles: files.length,
+            processedFiles: files.length,
+            totalSize,
+          },
+        });
+
+        controller.close();
+      } catch (error) {
+        console.error("Upload error:", error);
+        sendSSEEvent({
+          category: "upload",
+          type: "error",
+          data: {
+            message: error instanceof Error ? error.message : "Upload failed",
+          },
+        });
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Cache-Control",
+    },
+  });
+}
+
+// Helper function to handle file upload (non-streaming)
 async function handleFileUpload(
   request: NextRequest,
   user: SelectUser,
@@ -207,7 +551,8 @@ async function handleFileUpload(
   };
 
   // Process each file
-  for (const file of files) {
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
     try {
       // Check storage limit before processing
       if (user.storageUsed + file.size > user.storageLimit) {
@@ -325,12 +670,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Smart content-type detection
+    const searchParams = request.nextUrl.searchParams;
+    const streamProgress = searchParams.get("stream") === "true";
     const contentType = request.headers.get("content-type");
 
     if (contentType?.includes("multipart/form-data")) {
-      // Handle file upload
-      return handleFileUpload(request, user, clerkUserId);
+      // Handle file upload with optional streaming
+      if (streamProgress) {
+        return handleFileUploadWithSSE(request, user, clerkUserId);
+      } else {
+        return handleFileUpload(request, user, clerkUserId);
+      }
     } else if (contentType?.includes("application/json")) {
       // Handle folder creation
       return handleFolderCreation(request, user);

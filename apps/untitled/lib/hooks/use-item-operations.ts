@@ -126,15 +126,9 @@ async function getItemMetadata(itemId: string): Promise<ItemResponse> {
   return response.json();
 }
 
-// Delete item (with S3 cleanup for files)
-async function deleteItem(
-  itemId: string,
-  permanent = false,
-): Promise<ItemDeleteResponse> {
-  const params = new URLSearchParams();
-  if (permanent) params.append("permanent", "true");
-
-  const response = await fetch(`/api/items/${itemId}?${params.toString()}`, {
+// Delete item permanently (remove from database and S3)
+async function deleteItem(itemId: string): Promise<ItemDeleteResponse> {
+  const response = await fetch(`/api/items/${itemId}?permanent=true`, {
     method: "DELETE",
   });
 
@@ -217,20 +211,32 @@ export function useItemDelete() {
     Error,
     {
       itemId: string;
-      permanent?: boolean;
     }
   >({
-    mutationFn: ({ itemId, permanent }) => deleteItem(itemId, permanent),
+    mutationFn: ({ itemId }) => deleteItem(itemId),
     onSuccess: (data, variables) => {
-      // Invalidate items queries to refresh the UI
+      // Invalidate all relevant queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ["items"] });
-      queryClient.invalidateQueries({ queryKey: ["userStorage"] });
+      queryClient.invalidateQueries({ queryKey: ["folderChildren"] });
+      queryClient.invalidateQueries({ queryKey: ["search"] });
+      queryClient.invalidateQueries({ queryKey: ["user", "storage"] });
 
-      // Show success message (this will be overridden by specific folder/file messages)
-      const action = variables.permanent
-        ? "permanently deleted"
-        : "moved to trash";
-      toast.success(`Item ${action} successfully`);
+      // Remove specific item data since it's deleted
+      queryClient.removeQueries({
+        queryKey: ["itemPreview", variables.itemId],
+      });
+      queryClient.removeQueries({
+        queryKey: ["itemMetadata", variables.itemId],
+      });
+
+      // Show success message
+      toast.success(`Item deleted successfully`);
+
+      // Show storage freed message if applicable
+      if (data.sizeFreed && data.sizeFreed > 0) {
+        const sizeFreedFormatted = formatFileSize(data.sizeFreed);
+        toast.success(`${sizeFreedFormatted} of storage freed`);
+      }
     },
     onError: (error) => {
       console.error("Delete failed:", error);
@@ -353,7 +359,7 @@ async function updateItem(
   return response.json();
 }
 
-// Upload files with progress tracking
+// Upload files with unified SSE progress tracking
 async function uploadFilesWithProgress(
   files: File[],
   parentId?: string,
@@ -378,80 +384,114 @@ async function uploadFilesWithProgress(
     status: "uploading" as const,
   }));
 
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-
-    // Track upload progress
-    xhr.upload.addEventListener("progress", (event) => {
-      if (event.lengthComputable) {
-        const percentComplete = (event.loaded / event.total) * 100;
-
-        const updatedProgress = initialProgress.map((item) => ({
-          ...item,
-          progress: Math.min(percentComplete, 90), // Reserve 90-100% for processing
-          status:
-            percentComplete < 90
-              ? ("uploading" as const)
-              : ("processing" as const),
-        }));
-
-        onProgress?.(updatedProgress);
-      }
+  try {
+    // Use unified streaming endpoint
+    const response = await fetch("/api/items?stream=true", {
+      method: "POST",
+      body: formData,
     });
 
-    // Handle response
-    xhr.addEventListener("load", () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const response = JSON.parse(xhr.responseText);
+    if (!response.ok) {
+      throw new Error(`Upload failed with status ${response.status}`);
+    }
 
-          // Mark as completed
-          const completedProgress = initialProgress.map((item) => ({
-            ...item,
-            progress: 100,
-            status: "completed" as const,
-          }));
+    if (!response.body) {
+      throw new Error("No response stream available");
+    }
 
-          onProgress?.(completedProgress);
-          resolve(response);
-        } catch {
-          reject(new Error("Failed to parse response"));
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let finalResult: UploadResponse | null = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+
+      // Keep the last incomplete line in buffer
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          try {
+            const eventData = JSON.parse(line.slice(6));
+
+            if (eventData.category === "upload") {
+              if (eventData.type === "progress") {
+                // Update progress based on server-side events
+                const updatedProgress = initialProgress.map((item) => ({
+                  ...item,
+                  progress: eventData.data.progress || 0,
+                  status:
+                    eventData.data.phase === "completed"
+                      ? ("completed" as const)
+                      : eventData.data.phase === "uploading"
+                        ? ("uploading" as const)
+                        : ("processing" as const),
+                }));
+
+                onProgress?.(updatedProgress);
+              } else if (eventData.type === "completed") {
+                // Mark all as completed
+                const completedProgress = initialProgress.map((item) => ({
+                  ...item,
+                  progress: 100,
+                  status: "completed" as const,
+                }));
+
+                onProgress?.(completedProgress);
+
+                // Create final result from event data
+                finalResult = {
+                  files: [], // Will be populated from actual response
+                  totalSize: eventData.data.totalSize || 0,
+                  message: eventData.data.message || "Upload completed",
+                  newStorageUsed: 0, // Will be calculated
+                  storageLimit: 0, // Will be populated
+                };
+              } else if (eventData.type === "error") {
+                // Mark as error
+                const errorProgress = initialProgress.map((item) => ({
+                  ...item,
+                  status: "error" as const,
+                  error: eventData.data.message || "Upload failed",
+                }));
+
+                onProgress?.(errorProgress);
+                throw new Error(eventData.data.message || "Upload failed");
+              }
+            }
+          } catch (parseError) {
+            console.error("Failed to parse SSE event:", parseError);
+          }
         }
-      } else {
-        try {
-          const errorResponse = JSON.parse(xhr.responseText);
-
-          // Mark as error
-          const errorProgress = initialProgress.map((item) => ({
-            ...item,
-            status: "error" as const,
-            error: errorResponse.error || "Upload failed",
-          }));
-
-          onProgress?.(errorProgress);
-          reject(errorResponse);
-        } catch {
-          reject(new Error(`Upload failed with status ${xhr.status}`));
-        }
       }
-    });
+    }
 
-    // Handle network errors
-    xhr.addEventListener("error", () => {
-      const errorProgress = initialProgress.map((item) => ({
-        ...item,
-        status: "error" as const,
-        error: "Network error",
-      }));
+    // Return the final result or a default response
+    return (
+      finalResult || {
+        files: [],
+        totalSize: 0,
+        message: "Upload completed",
+        newStorageUsed: 0,
+        storageLimit: 0,
+      }
+    );
+  } catch (error) {
+    // Mark as error
+    const errorProgress = initialProgress.map((item) => ({
+      ...item,
+      status: "error" as const,
+      error: error instanceof Error ? error.message : "Upload failed",
+    }));
 
-      onProgress?.(errorProgress);
-      reject(new Error("Network error during upload"));
-    });
-
-    // Send request
-    xhr.open("POST", "/api/items");
-    xhr.send(formData);
-  });
+    onProgress?.(errorProgress);
+    throw error;
+  }
 }
 
 // Note: uploadFiles function removed - use uploadFilesWithProgress directly
@@ -513,17 +553,12 @@ export function useItemUpload() {
   >({
     mutationFn: ({ files, parentId, onProgress }) =>
       uploadFilesWithProgress(files, parentId, onProgress),
-    onSuccess: (data, variables) => {
-      // Invalidate items queries to refresh the UI
+    onSuccess: () => {
+      // Invalidate all relevant queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ["items"] });
-      queryClient.invalidateQueries({ queryKey: ["userStorage"] });
-
-      // Invalidate specific parent folder if provided
-      if (variables.parentId) {
-        queryClient.invalidateQueries({
-          queryKey: ["items", variables.parentId],
-        });
-      }
+      queryClient.invalidateQueries({ queryKey: ["folderChildren"] });
+      queryClient.invalidateQueries({ queryKey: ["search"] });
+      queryClient.invalidateQueries({ queryKey: ["user", "storage"] });
     },
     onError: (error) => {
       console.error("Upload failed:", error);
@@ -545,8 +580,18 @@ export function useItemUpdate() {
   >({
     mutationFn: ({ id, data }) => updateItem(id, data),
     onSuccess: (response, variables) => {
-      // Invalidate items queries to refresh the UI
+      // Invalidate all relevant queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["folderChildren"] });
+      queryClient.invalidateQueries({ queryKey: ["search"] });
+
+      // Invalidate specific item data
+      queryClient.invalidateQueries({
+        queryKey: ["itemPreview", variables.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["itemMetadata", variables.id],
+      });
 
       // Show success message
       if (variables.data.name) {
@@ -578,8 +623,10 @@ export function useItemCreate() {
   >({
     mutationFn: ({ name, parentId }) => createFolder(name, parentId),
     onSuccess: (response, variables) => {
-      // Invalidate items queries to refresh the UI
+      // Invalidate all relevant queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["folderChildren"] });
+      queryClient.invalidateQueries({ queryKey: ["search"] });
 
       // Show success message
       toast.success(`Folder "${variables.name}" created successfully`);
@@ -650,19 +697,10 @@ export function useItemOperations() {
       }
     },
 
-    // Delete item (soft delete)
+    // Delete item permanently (remove from database and S3)
     delete: (itemId: string) => {
       return deleteMutation.mutateAsync({
         itemId,
-        permanent: false,
-      });
-    },
-
-    // Permanently delete item (with S3 cleanup)
-    permanentDelete: (itemId: string) => {
-      return deleteMutation.mutateAsync({
-        itemId,
-        permanent: true,
       });
     },
 

@@ -5,7 +5,7 @@ import {
   useItems,
   type UploadProgress,
 } from "@/lib/hooks/use-item-operations";
-import { ArrowUpDown, Download, Eye, Upload } from "lucide-react";
+import { ArrowUpDown, Download, Eye, Trash2, Upload } from "lucide-react";
 import { useState } from "react";
 import toast from "react-hot-toast";
 
@@ -156,7 +156,7 @@ export default function Home() {
     <>
       {/* File List */}
       <div
-        className="relative flex-1 overflow-auto py-3 pl-3 pr-6"
+        className="relative flex-1 overflow-auto py-3 pr-6 pl-3"
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -230,7 +230,7 @@ export default function Home() {
                             await itemOperations.preview(file.id, file.name);
                           }}
                           disabled={itemOperations.isDownloading}
-                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50"
+                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
                           title="Preview file"
                         >
                           <Eye className="h-3 w-3" />
@@ -240,10 +240,20 @@ export default function Home() {
                             itemOperations.download(file.id, file.name)
                           }
                           disabled={itemOperations.isDownloading}
-                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50"
+                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
                           title="Download file"
                         >
                           <Download className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            await itemOperations.delete(file.id);
+                          }}
+                          disabled={itemOperations.isDeleting}
+                          className="inline-flex items-center rounded-md border border-red-300 bg-white px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
+                          title="Delete file"
+                        >
+                          <Trash2 className="h-3 w-3" />
                         </button>
                       </div>
                     )}
@@ -256,7 +266,7 @@ export default function Home() {
 
         {/* Upload Progress */}
         {uploadingFiles.length > 0 && (
-          <div className="absolute bottom-4 right-4 w-80 space-y-2">
+          <div className="absolute right-4 bottom-4 w-80 space-y-2">
             {uploadingFiles.map((file) => (
               <div
                 key={file.fileName}
@@ -290,7 +300,7 @@ export default function Home() {
 
         {/* Drag Overlay */}
         {isDragOver && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-lg border-2 border-dashed border-green-300 bg-green-50 bg-opacity-90">
+          <div className="bg-opacity-90 absolute inset-0 flex items-center justify-center rounded-lg border-2 border-dashed border-green-300 bg-green-50">
             <div className="text-center">
               <Upload className="mx-auto mb-4 h-12 w-12 text-green-500" />
               <h3 className="mb-2 text-lg font-medium text-green-700">
