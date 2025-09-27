@@ -294,8 +294,17 @@ export default function FolderNavigationPage({
                     {!file.isFolder && (
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={async () => {
-                            await itemOperations.preview(file.id, file.name);
+                          onClick={() => {
+                            const previewPromise = itemOperations.preview(
+                              file.id,
+                              file.name,
+                            );
+                            toast.promise(previewPromise, {
+                              loading: `Opening preview for "${file.name}"...`,
+                              success: `Preview opened for "${file.name}"`,
+                              error: (err) =>
+                                `Failed to preview "${file.name}": ${err instanceof Error ? err.message : "Preview failed"}`,
+                            });
                           }}
                           disabled={itemOperations.isDownloading}
                           className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
@@ -304,9 +313,18 @@ export default function FolderNavigationPage({
                           <Eye className="h-3 w-3" />
                         </button>
                         <button
-                          onClick={() =>
-                            itemOperations.download(file.id, file.name)
-                          }
+                          onClick={() => {
+                            const downloadPromise = itemOperations.download(
+                              file.id,
+                              file.name,
+                            );
+                            toast.promise(downloadPromise, {
+                              loading: `Downloading "${file.name}"...`,
+                              success: `Downloaded "${file.name}"`,
+                              error: (err) =>
+                                `Failed to download "${file.name}": ${err instanceof Error ? err.message : "Download failed"}`,
+                            });
+                          }}
                           disabled={itemOperations.isDownloading}
                           className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
                           title="Download file"
@@ -314,8 +332,27 @@ export default function FolderNavigationPage({
                           <Download className="h-3 w-3" />
                         </button>
                         <button
-                          onClick={async () => {
-                            await itemOperations.delete(file.id);
+                          onClick={() => {
+                            const deletePromise = itemOperations.delete(
+                              file.id,
+                            );
+                            toast.promise(deletePromise, {
+                              loading: `Deleting "${file.name}"...`,
+                              success: (result) => {
+                                let message = "Item deleted successfully";
+                                if (result.sizeFreed && result.sizeFreed > 0) {
+                                  const sizeFreedFormatted = formatFileSize(
+                                    result.sizeFreed,
+                                  );
+                                  message += ` • ${sizeFreedFormatted} of storage freed`;
+                                }
+                                return message;
+                              },
+                              error: (err) =>
+                                err instanceof Error
+                                  ? err.message
+                                  : "Delete failed",
+                            });
                           }}
                           disabled={itemOperations.isDeleting}
                           className="inline-flex items-center rounded-md border border-red-300 bg-white px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"

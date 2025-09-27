@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
 
 // Types
 export interface ItemDownloadResponse {
@@ -168,18 +167,10 @@ export function useItemDownload() {
       // Automatically trigger download if download option is true
       if (variables.options?.download !== false) {
         triggerDownload(blob, variables.fileName);
-        toast.success(`Downloaded "${variables.fileName}"`);
-      } else if (variables.options?.preview) {
-        toast.success(`Preview ready for "${variables.fileName}"`);
       }
     },
     onError: (error, variables) => {
       console.error("Download failed:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Download failed";
-      toast.error(
-        `Failed to download "${variables.fileName}": ${errorMessage}`,
-      );
     },
   });
 }
@@ -228,21 +219,9 @@ export function useItemDelete() {
       queryClient.removeQueries({
         queryKey: ["itemMetadata", variables.itemId],
       });
-
-      // Show success message
-      toast.success(`Item deleted successfully`);
-
-      // Show storage freed message if applicable
-      if (data.sizeFreed && data.sizeFreed > 0) {
-        const sizeFreedFormatted = formatFileSize(data.sizeFreed);
-        toast.success(`${sizeFreedFormatted} of storage freed`);
-      }
     },
     onError: (error) => {
       console.error("Delete failed:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Delete failed";
-      toast.error(errorMessage);
     },
   });
 }
@@ -592,19 +571,9 @@ export function useItemUpdate() {
       queryClient.invalidateQueries({
         queryKey: ["itemMetadata", variables.id],
       });
-
-      // Show success message
-      if (variables.data.name) {
-        toast.success(`Item renamed to "${variables.data.name}"`);
-      } else {
-        toast.success("Item updated successfully");
-      }
     },
     onError: (error) => {
       console.error("Update failed:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Update failed";
-      toast.error(errorMessage);
     },
   });
 }
@@ -627,17 +596,9 @@ export function useItemCreate() {
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["folderChildren"] });
       queryClient.invalidateQueries({ queryKey: ["search"] });
-
-      // Show success message
-      toast.success(`Folder "${variables.name}" created successfully`);
     },
     onError: (error, variables) => {
       console.error("Create folder failed:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to create folder";
-      toast.error(
-        `Failed to create folder "${variables.name}": ${errorMessage}`,
-      );
     },
   });
 }
@@ -675,7 +636,7 @@ export function useItemOperations() {
 
     // Download item
     download: (itemId: string, fileName: string) => {
-      downloadMutation.mutate({
+      return downloadMutation.mutateAsync({
         itemId,
         fileName,
         options: { download: true },
@@ -688,12 +649,9 @@ export function useItemOperations() {
         const previewData = await getItemPreviewUrl(itemId);
         // Open the presigned URL in a new tab for preview
         window.open(previewData.url, "_blank", "noopener,noreferrer");
-        toast.success(`Preview opened for "${fileName}"`);
       } catch (error) {
         console.error("Preview failed:", error);
-        const errorMessage =
-          error instanceof Error ? error.message : "Preview failed";
-        toast.error(`Failed to preview "${fileName}": ${errorMessage}`);
+        throw error; // Re-throw so UI can handle the error
       }
     },
 

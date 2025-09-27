@@ -8,7 +8,7 @@ import {
 } from "@/lib/hooks/use-item-operations";
 import { useSearch } from "@/lib/hooks/use-search";
 import { useUserStorage } from "@/lib/hooks/use-user-storage";
-import { cn } from "@/lib/utils";
+import { cn, formatFileSize } from "@/lib/utils";
 import {
   ArrowLeft,
   ChevronDown,
@@ -141,29 +141,42 @@ export default function DashboardLayout({
     setRenameValue("");
   };
 
-  const handleRenameFolder = async () => {
+  const handleRenameFolder = () => {
     if (renameValue.trim() && renameValue !== folderActionsModal.folderName) {
-      try {
-        await itemOperations.updateItem(folderActionsModal.folderId, {
+      const renamePromise = itemOperations.updateItem(
+        folderActionsModal.folderId,
+        {
           name: renameValue.trim(),
-        });
-        // Toast notification is handled by the useItemUpdate hook
-      } catch (error) {
-        console.error("Failed to rename folder:", error);
-        // Error toast is also handled by the useItemUpdate hook
-      }
+        },
+      );
+
+      toast.promise(renamePromise, {
+        loading: `Renaming "${folderActionsModal.folderName}" to "${renameValue.trim()}"...`,
+        success: `Folder renamed to "${renameValue.trim()}" successfully!`,
+        error: (err) =>
+          `Failed to rename folder: ${err instanceof Error ? err.message : "Unknown error"}`,
+      });
     }
     closeFolderActions();
   };
 
-  const handleDeleteFolder = async () => {
-    try {
-      await itemOperations.delete(folderActionsModal.folderId);
-      // Toast notification is handled by the useItemDelete hook
-    } catch (error) {
-      console.error("Failed to delete folder:", error);
-      // Error toast is also handled by the useItemDelete hook
-    }
+  const handleDeleteFolder = () => {
+    const deletePromise = itemOperations.delete(folderActionsModal.folderId);
+
+    toast.promise(deletePromise, {
+      loading: `Deleting "${folderActionsModal.folderName}" and all its contents...`,
+      success: (result) => {
+        let message = `Folder "${folderActionsModal.folderName}" deleted successfully!`;
+        if (result.sizeFreed && result.sizeFreed > 0) {
+          const sizeFreedFormatted = formatFileSize(result.sizeFreed);
+          message += ` • ${sizeFreedFormatted} of storage freed`;
+        }
+        return message;
+      },
+      error: (err) =>
+        `Failed to delete folder: ${err instanceof Error ? err.message : "Unknown error"}`,
+    });
+
     closeFolderActions();
   };
 
@@ -206,14 +219,6 @@ export default function DashboardLayout({
       // Clear upload progress
       setUploadingFiles([]);
     }
-  };
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   const triggerFileUpload = (uploadFolders = false, parentId?: string) => {
