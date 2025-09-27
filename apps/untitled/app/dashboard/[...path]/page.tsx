@@ -154,31 +154,6 @@ export default function FolderNavigationPage({
     }
   };
 
-  // Generate breadcrumb navigation
-  const generateBreadcrumbs = () => {
-    const breadcrumbs = [
-      {
-        name: "Dashboard",
-        path: "/dashboard",
-        isLast: folderPath.length === 0,
-      },
-    ];
-
-    if (folderData?.path) {
-      folderData.path.forEach((folder, index) => {
-        const encodedPath = folderPath
-          .slice(0, index + 1)
-          .map(encodeURIComponent)
-          .join("/");
-        const path = `/dashboard/${encodedPath}`;
-        const isLast = index === folderData.path.length - 1;
-        breadcrumbs.push({ name: folder.name, path, isLast });
-      });
-    }
-
-    return breadcrumbs;
-  };
-
   // Error state for invalid paths
   if (pathError) {
     return (
@@ -237,51 +212,7 @@ export default function FolderNavigationPage({
   }
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Breadcrumb Navigation */}
-      <div className="border-b border-gray-200 bg-white px-6 py-4">
-        <nav className="flex items-center space-x-2 text-sm">
-          <Home className="h-4 w-4 text-gray-400" />
-          {generateBreadcrumbs().map((breadcrumb, index) => (
-            <div key={breadcrumb.path} className="flex items-center">
-              {index > 0 && <span className="mx-2 text-gray-400">/</span>}
-              {breadcrumb.isLast ? (
-                <span className="font-medium text-gray-900">
-                  {breadcrumb.name}
-                </span>
-              ) : (
-                <Link
-                  href={breadcrumb.path}
-                  className="text-gray-600 hover:text-gray-900"
-                >
-                  {breadcrumb.name}
-                </Link>
-              )}
-            </div>
-          ))}
-        </nav>
-      </div>
-
-      {/* Main Content Header */}
-      <div className="border-b border-gray-200 bg-white px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {currentFolderName}
-            </h1>
-            <p className="mt-1 text-sm text-gray-600">
-              {files.length} {files.length === 1 ? "item" : "items"}
-            </p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <button className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-              <ArrowUpDown className="mr-2 h-4 w-4" />
-              Sort
-            </button>
-          </div>
-        </div>
-      </div>
-
+    <>
       {/* File List */}
       <div
         className="relative flex-1 overflow-auto py-3 pr-6 pl-3"
@@ -459,6 +390,6 @@ export default function FolderNavigationPage({
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }

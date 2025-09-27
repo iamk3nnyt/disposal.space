@@ -17,6 +17,7 @@ import {
   File,
   Folder,
   FolderPlus,
+  Home,
   MoreHorizontal,
   Plus,
   Search,
@@ -542,9 +543,54 @@ export default function DashboardLayout({
               ) : (
                 <div className="flex h-16 w-full items-center justify-between border-b border-gray-200 px-6">
                   <div className="flex items-center">
-                    <h2 className="text-base font-medium text-gray-900">
-                      Maybe Later
-                    </h2>
+                    {pathname.startsWith("/dashboard/") &&
+                    pathname !== "/dashboard" ? (
+                      // Show breadcrumbs for nested folder paths
+                      <nav className="flex items-center space-x-2 text-sm">
+                        <Home className="h-4 w-4 text-gray-400" />
+                        <Link
+                          href="/dashboard"
+                          className="text-gray-600 hover:text-gray-900"
+                        >
+                          Dashboard
+                        </Link>
+                        {pathname
+                          .replace("/dashboard", "")
+                          .split("/")
+                          .filter(Boolean)
+                          .map((segment, index, segments) => {
+                            const decodedSegment = decodeURIComponent(segment);
+                            const isLast = index === segments.length - 1;
+                            const path = `/dashboard/${segments
+                              .slice(0, index + 1)
+                              .map(encodeURIComponent)
+                              .join("/")}`;
+
+                            return (
+                              <div key={path} className="flex items-center">
+                                <span className="mx-2 text-gray-400">/</span>
+                                {isLast ? (
+                                  <span className="font-medium text-gray-900">
+                                    {decodedSegment}
+                                  </span>
+                                ) : (
+                                  <Link
+                                    href={path}
+                                    className="text-gray-600 hover:text-gray-900"
+                                  >
+                                    {decodedSegment}
+                                  </Link>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </nav>
+                    ) : (
+                      // Show "Maybe Later" for dashboard root
+                      <h2 className="text-base font-medium text-gray-900">
+                        Maybe Later
+                      </h2>
+                    )}
                   </div>
                   <div className="flex items-center space-x-3">
                     <Link
