@@ -1,24 +1,54 @@
 "use client";
 
+import { useFolderPath } from "@/lib/hooks/use-folder-path";
 import {
   useItemOperations,
   useItems,
   type UploadProgress,
 } from "@/lib/hooks/use-item-operations";
-import { ArrowUpDown, Download, Eye, Trash2, Upload } from "lucide-react";
+import { ArrowUpDown, Download, Eye, Home, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import React, { useState } from "react";
 import toast from "react-hot-toast";
 
-export default function Home() {
+interface FolderNavigationPageProps {
+  params: Promise<{ path: string[] }>;
+}
+
+export default function FolderNavigationPage({
+  params,
+}: FolderNavigationPageProps) {
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<UploadProgress[]>([]);
+
+  // Resolve params
+  const [resolvedParams, setResolvedParams] = useState<{
+    path: string[];
+  } | null>(null);
+
+  React.useEffect(() => {
+    params.then(setResolvedParams);
+  }, [params]);
+
+  // Get the current folder path from URL
+  const folderPath = resolvedParams?.path || [];
+
+  // Resolve folder path to actual folder ID
+  const {
+    data: folderData,
+    isLoading: isLoadingPath,
+    error: pathError,
+  } = useFolderPath(folderPath);
+
+  // Get items for the resolved folder
+  const { data: itemsData, isLoading: isLoadingItems } = useItems(
+    folderData?.folderId,
+  );
   const itemOperations = useItemOperations();
 
-  // Fetch items from API
-  const { data: itemsData, isLoading, error } = useItems();
-  const files = itemsData?.items || [];
+  const isLoading = isLoadingPath || isLoadingItems;
+  const currentFolderName = folderData?.folderName || "Dashboard";
 
   const toggleFileSelection = (fileId: string) => {
     setSelectedFiles((prev) =>
@@ -27,6 +57,8 @@ export default function Home() {
         : [...prev, fileId],
     );
   };
+
+  const files = itemsData?.items || [];
 
   const toggleSelectAll = () => {
     if (selectedFiles.length === files.length) {
@@ -61,7 +93,7 @@ export default function Home() {
     try {
       const result = await itemOperations.uploadFiles(
         droppedFiles,
-        undefined,
+        folderData?.folderId || undefined,
         (progress) => {
           setUploadingFiles(progress);
         },
@@ -122,6 +154,57 @@ export default function Home() {
     }
   };
 
+  // Generate breadcrumb navigation
+  const generateBreadcrumbs = () => {
+    const breadcrumbs = [
+      {
+        name: "Dashboard",
+        path: "/dashboard",
+        isLast: folderPath.length === 0,
+      },
+    ];
+
+    if (folderData?.path) {
+      folderData.path.forEach((folder, index) => {
+        const encodedPath = folderPath
+          .slice(0, index + 1)
+          .map(encodeURIComponent)
+          .join("/");
+        const path = `/dashboard/${encodedPath}`;
+        const isLast = index === folderData.path.length - 1;
+        breadcrumbs.push({ name: folder.name, path, isLast });
+      });
+    }
+
+    return breadcrumbs;
+  };
+
+  // Error state for invalid paths
+  if (pathError) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+            <Home className="h-6 w-6 text-red-600" />
+          </div>
+          <h3 className="mb-2 text-lg font-medium text-gray-900">
+            Folder Not Found
+          </h3>
+          <p className="mb-4 text-sm text-gray-500">
+            The folder path you&apos;re looking for doesn&apos;t exist.
+          </p>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+          >
+            <Home className="mr-2 h-4 w-4" />
+            Back to Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   // Loading state
   if (isLoading) {
     return (
@@ -136,8 +219,8 @@ export default function Home() {
     );
   }
 
-  // Error state
-  if (error) {
+  // Error state for data loading (not path errors)
+  if (!pathError && itemsData === undefined && !isLoadingItems) {
     return (
       <div className="flex h-full flex-1 items-center justify-center">
         <div className="text-center">
@@ -146,7 +229,7 @@ export default function Home() {
             Failed to load items
           </h3>
           <p className="text-sm text-gray-500">
-            {error instanceof Error ? error.message : "Something went wrong"}
+            Something went wrong loading the folder contents
           </p>
         </div>
       </div>
@@ -154,7 +237,51 @@ export default function Home() {
   }
 
   return (
-    <>
+    <div className="flex h-full flex-col">
+      {/* Breadcrumb Navigation */}
+      <div className="border-b border-gray-200 bg-white px-6 py-4">
+        <nav className="flex items-center space-x-2 text-sm">
+          <Home className="h-4 w-4 text-gray-400" />
+          {generateBreadcrumbs().map((breadcrumb, index) => (
+            <div key={breadcrumb.path} className="flex items-center">
+              {index > 0 && <span className="mx-2 text-gray-400">/</span>}
+              {breadcrumb.isLast ? (
+                <span className="font-medium text-gray-900">
+                  {breadcrumb.name}
+                </span>
+              ) : (
+                <Link
+                  href={breadcrumb.path}
+                  className="text-gray-600 hover:text-gray-900"
+                >
+                  {breadcrumb.name}
+                </Link>
+              )}
+            </div>
+          ))}
+        </nav>
+      </div>
+
+      {/* Main Content Header */}
+      <div className="border-b border-gray-200 bg-white px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {currentFolderName}
+            </h1>
+            <p className="mt-1 text-sm text-gray-600">
+              {files.length} {files.length === 1 ? "item" : "items"}
+            </p>
+          </div>
+          <div className="flex items-center space-x-3">
+            <button className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              <ArrowUpDown className="mr-2 h-4 w-4" />
+              Sort
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* File List */}
       <div
         className="relative flex-1 overflow-auto py-3 pr-6 pl-3"
@@ -205,7 +332,7 @@ export default function Home() {
                       <div className="text-2xl">{getFileIcon(file.type)}</div>
                       {file.isFolder ? (
                         <Link
-                          href={`/dashboard/${encodeURIComponent(file.name)}`}
+                          href={`/dashboard/${[...folderPath, encodeURIComponent(file.name)].join("/")}`}
                           className="text-sm font-medium text-gray-900 hover:text-green-600"
                         >
                           {file.name}
@@ -280,29 +407,38 @@ export default function Home() {
             {uploadingFiles.map((file) => (
               <div
                 key={file.fileName}
-                className="rounded-lg border border-gray-200 bg-white p-4 shadow-lg"
+                className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
               >
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Upload className="h-4 w-4 text-green-500" />
-                    <span className="truncate text-sm font-medium text-gray-900">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">
                       {file.fileName}
-                    </span>
+                    </p>
+                    <p className="text-xs text-gray-500">{file.size}</p>
                   </div>
-                  <span className="text-xs text-gray-500">{file.size}</span>
+                  <div className="ml-4 text-right">
+                    <p className="text-sm font-medium text-gray-900">
+                      {Math.round(file.progress)}%
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {file.status === "uploading" && "Disposing..."}
+                      {file.status === "processing" && "Processing..."}
+                      {file.status === "completed" && "Complete!"}
+                      {file.status === "error" && "Error"}
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>Disposing...</span>
-                    <span>{Math.round(file.progress)}%</span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-gray-200">
+                <div className="mt-2">
+                  <div className="h-2 rounded-full bg-gray-200">
                     <div
                       className="h-2 rounded-full bg-green-500 transition-all duration-300"
                       style={{ width: `${file.progress}%` }}
                     />
                   </div>
                 </div>
+                {file.status === "error" && file.error && (
+                  <p className="mt-1 text-xs text-red-600">{file.error}</p>
+                )}
               </div>
             ))}
           </div>
@@ -313,16 +449,16 @@ export default function Home() {
           <div className="bg-opacity-90 absolute inset-0 flex items-center justify-center rounded-lg border-2 border-dashed border-green-300 bg-green-50">
             <div className="text-center">
               <Upload className="mx-auto mb-4 h-12 w-12 text-green-500" />
-              <h3 className="mb-2 text-lg font-medium text-green-700">
-                Drop files to dispose
-              </h3>
+              <p className="text-lg font-medium text-green-700">
+                Drop files here to dispose
+              </p>
               <p className="text-sm text-green-600">
-                Release to add files to your disposal space
+                Files will be uploaded to this folder
               </p>
             </div>
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }

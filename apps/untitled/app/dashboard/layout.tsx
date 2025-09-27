@@ -97,6 +97,39 @@ export default function DashboardLayout({
     });
   };
 
+  // Function to check if a folder is currently active based on pathname
+  const isFolderActive = (folderName: string, level: number = 0) => {
+    if (pathname === "/dashboard" && level === 0) return false;
+
+    const pathSegments = pathname
+      .replace("/dashboard", "")
+      .split("/")
+      .filter(Boolean);
+    if (pathSegments.length === 0) return false;
+
+    // Decode the path segment to match the folder name
+    const decodedSegment = pathSegments[level]
+      ? decodeURIComponent(pathSegments[level])
+      : "";
+    return decodedSegment === folderName;
+  };
+
+  // Function to check if any child of a folder is active (for parent highlighting)
+  const hasActiveChild = (folderName: string) => {
+    if (pathname === "/dashboard") return false;
+
+    const pathSegments = pathname
+      .replace("/dashboard", "")
+      .split("/")
+      .filter(Boolean);
+    if (pathSegments.length < 2) return false;
+
+    const decodedFirstSegment = pathSegments[0]
+      ? decodeURIComponent(pathSegments[0])
+      : "";
+    return decodedFirstSegment === folderName;
+  };
+
   const openFolderActions = (folderId: string, folderName: string) => {
     setFolderActionsModal({ isOpen: true, folderId, folderName });
     setRenameValue(folderName);
@@ -358,22 +391,31 @@ export default function DashboardLayout({
                     <div key={item.id}>
                       <div
                         className={cn(
-                          "flex cursor-pointer items-center space-x-2 rounded-md px-2 py-1 text-sm",
-                          item.isActive && pathname === "/dashboard"
+                          "flex items-center space-x-2 rounded-md px-2 py-1 text-sm",
+                          isFolderActive(item.name, 0) ||
+                            hasActiveChild(item.name)
                             ? "bg-gray-200 text-gray-900"
                             : "text-gray-700 hover:bg-gray-100",
                         )}
                       >
-                        <div className="flex flex-1 items-center space-x-2 truncate">
-                          {item.type === "folder" ? (
+                        {item.type === "folder" ? (
+                          <Link
+                            href={`/dashboard/${encodeURIComponent(item.name)}`}
+                            className="flex flex-1 cursor-pointer items-center space-x-2 truncate"
+                          >
                             <Folder className="h-4 w-4 shrink-0" />
-                          ) : (
+                            <span className="truncate whitespace-nowrap">
+                              {item.name}
+                            </span>
+                          </Link>
+                        ) : (
+                          <div className="flex flex-1 cursor-pointer items-center space-x-2 truncate">
                             <File className="h-4 w-4 shrink-0" />
-                          )}
-                          <span className="truncate whitespace-nowrap">
-                            {item.name}
-                          </span>
-                        </div>
+                            <span className="truncate whitespace-nowrap">
+                              {item.name}
+                            </span>
+                          </div>
+                        )}
                         {item.type === "folder" && (
                           <div className="flex items-center space-x-1">
                             <button
@@ -418,14 +460,27 @@ export default function DashboardLayout({
                           {item.children.map((child) => (
                             <div
                               key={child.id}
-                              className="flex cursor-pointer items-center space-x-2 rounded-md px-2 py-0.5 text-sm text-gray-600 hover:bg-gray-100"
+                              className={cn(
+                                "flex items-center space-x-2 rounded-md px-2 py-0.5 text-sm",
+                                isFolderActive(child.name, 1)
+                                  ? "bg-gray-200 text-gray-900"
+                                  : "text-gray-600 hover:bg-gray-100",
+                              )}
                             >
                               {child.type === "folder" ? (
-                                <Folder className="h-3 w-3" />
+                                <Link
+                                  href={`/dashboard/${encodeURIComponent(item.name)}/${encodeURIComponent(child.name)}`}
+                                  className="flex flex-1 cursor-pointer items-center space-x-2"
+                                >
+                                  <Folder className="h-3 w-3" />
+                                  <span>{child.name}</span>
+                                </Link>
                               ) : (
-                                <File className="h-3 w-3" />
+                                <div className="flex flex-1 cursor-pointer items-center space-x-2">
+                                  <File className="h-3 w-3" />
+                                  <span>{child.name}</span>
+                                </div>
                               )}
-                              <span>{child.name}</span>
                             </div>
                           ))}
                         </div>
