@@ -1,6 +1,11 @@
 import { formatFileSize, formatItemForFrontend } from "@/lib/utils";
 import { auth } from "@clerk/nextjs/server";
-import { db, items, users } from "@ketryon/database";
+import {
+  fileProcessor,
+  getFileExtension,
+  getFileTypeCategory,
+} from "@ketryon/aws";
+import { db, items, users, type SelectUser } from "@ketryon/database";
 import { and, eq, isNull } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -68,7 +73,157 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/items - Create new item (file or folder)
+// Helper function to handle folder creation
+async function handleFolderCreation(request: NextRequest, user: SelectUser) {
+  const body = await request.json();
+  const { name, type, parentId } = body;
+
+  // Validate required fields
+  if (!name || !type) {
+    return NextResponse.json(
+      { error: "Name and type are required" },
+      { status: 400 },
+    );
+  }
+
+  // Only allow folder creation via JSON
+  if (type !== "folder") {
+    return NextResponse.json(
+      {
+        error: "Only folders can be created via JSON. Use FormData for files.",
+      },
+      { status: 400 },
+    );
+  }
+
+  // Create the folder
+  const [newItem] = await db
+    .insert(items)
+    .values({
+      userId: user.id,
+      parentId: parentId || null,
+      name,
+      type: "folder",
+      fileType: null,
+      sizeBytes: 0,
+      mimeType: null,
+      filePath: null,
+    })
+    .returning();
+
+  return NextResponse.json({
+    item: formatItemForFrontend(newItem),
+    message: "Folder created successfully",
+  });
+}
+
+// Helper function to handle file upload
+async function handleFileUpload(
+  request: NextRequest,
+  user: SelectUser,
+  clerkUserId: string,
+) {
+  // Parse form data
+  const formData = await request.formData();
+  const files = formData.getAll("files") as File[];
+  const parentId = formData.get("parentId") as string | null;
+
+  if (!files || files.length === 0) {
+    return NextResponse.json({ error: "No files provided" }, { status: 400 });
+  }
+
+  const uploadResults = [];
+  let totalSize = 0;
+
+  // Process each file
+  for (const file of files) {
+    try {
+      // Check storage limit before processing
+      if (user.storageUsed + file.size > user.storageLimit) {
+        return NextResponse.json(
+          {
+            error: `Storage limit exceeded. File "${file.name}" would exceed your ${Math.round(user.storageLimit / (1024 * 1024 * 1024))}GB limit.`,
+            currentUsage: user.storageUsed,
+            limit: user.storageLimit,
+            fileSize: file.size,
+          },
+          { status: 413 },
+        );
+      }
+
+      // Convert File to Buffer
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Upload to S3 with validation and security scanning
+      const uploadResult = await fileProcessor.uploadAndProcess(
+        buffer,
+        file.name,
+        clerkUserId,
+      );
+
+      // Determine file type for database
+      const fileExtension = getFileExtension(file.name);
+      const fileCategory = getFileTypeCategory(file.name);
+
+      // Create database record
+      const [newItem] = await db
+        .insert(items)
+        .values({
+          userId: user.id,
+          parentId: parentId || null,
+          name: file.name,
+          type: "file",
+          fileType: fileExtension,
+          sizeBytes: file.size,
+          mimeType: uploadResult.mimeType,
+          filePath: uploadResult.key, // Store S3 key for future operations
+        })
+        .returning();
+
+      totalSize += file.size;
+
+      uploadResults.push({
+        file: formatItemForFrontend(newItem),
+        s3Key: uploadResult.key,
+        s3Url: uploadResult.url,
+        category: fileCategory,
+        size: file.size,
+        mimeType: uploadResult.mimeType,
+      });
+    } catch (fileError) {
+      console.error(`Error processing file ${file.name}:`, fileError);
+
+      // Return specific error for this file
+      return NextResponse.json(
+        {
+          error: `Failed to process file "${file.name}": ${fileError instanceof Error ? fileError.message : "Unknown error"}`,
+          fileName: file.name,
+        },
+        { status: 400 },
+      );
+    }
+  }
+
+  // Update user's storage usage
+  await db
+    .update(users)
+    .set({
+      storageUsed: user.storageUsed + totalSize,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, user.id));
+
+  return NextResponse.json({
+    message: `Successfully uploaded ${files.length} file(s)`,
+    files: uploadResults,
+    totalSize,
+    newStorageUsed: user.storageUsed + totalSize,
+    storageLimit: user.storageLimit,
+  });
+}
+
+// POST /api/items - Create items (folders via JSON, files via FormData)
 export async function POST(request: NextRequest) {
   try {
     const { userId: clerkUserId } = await auth();
@@ -87,58 +242,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const body = await request.json();
+    // Smart content-type detection
+    const contentType = request.headers.get("content-type");
 
-    const { name, type, parentId, fileType, sizeBytes = 0, mimeType } = body;
-
-    // Validate required fields
-    if (!name || !type) {
+    if (contentType?.includes("multipart/form-data")) {
+      // Handle file upload
+      return handleFileUpload(request, user, clerkUserId);
+    } else if (contentType?.includes("application/json")) {
+      // Handle folder creation
+      return handleFolderCreation(request, user);
+    } else {
       return NextResponse.json(
-        { error: "Name and type are required" },
+        {
+          error:
+            "Unsupported content type. Use 'application/json' for folders or 'multipart/form-data' for files.",
+        },
         { status: 400 },
       );
     }
-
-    // Check storage limit for files
-    if (type === "file" && sizeBytes > 0) {
-      if (user.storageUsed + sizeBytes > user.storageLimit) {
-        return NextResponse.json(
-          { error: "Storage limit exceeded" },
-          { status: 400 },
-        );
-      }
-    }
-
-    // Create the item
-    const [newItem] = await db
-      .insert(items)
-      .values({
-        userId: user.id,
-        parentId: parentId || null,
-        name,
-        type,
-        fileType: type === "file" ? fileType : null,
-        sizeBytes,
-        mimeType: type === "file" ? mimeType : null,
-      })
-      .returning();
-
-    // Update user's storage if it's a file
-    if (type === "file" && sizeBytes > 0) {
-      await db
-        .update(users)
-        .set({ storageUsed: user.storageUsed + sizeBytes })
-        .where(eq(users.id, user.id));
-    }
-
-    return NextResponse.json({
-      item: formatItemForFrontend(newItem),
-      message: `${type === "folder" ? "Folder" : "File"} created successfully`,
-    });
   } catch (error) {
     console.error("Error creating item:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: error instanceof Error ? error.message : "Failed to create item",
+        details: error instanceof Error ? error.stack : undefined,
+      },
       { status: 500 },
     );
   }

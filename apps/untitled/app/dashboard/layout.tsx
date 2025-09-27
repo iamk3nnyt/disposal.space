@@ -1,7 +1,11 @@
 "use client";
 
 import { useFolderChildren } from "@/lib/hooks/use-folder-children";
-import { useDeleteItem, useItems, useUpdateItem } from "@/lib/hooks/use-items";
+import {
+  useItemOperations,
+  useItems,
+  type UploadProgress,
+} from "@/lib/hooks/use-item-operations";
 import { useSearch } from "@/lib/hooks/use-search";
 import { useUserStorage } from "@/lib/hooks/use-user-storage";
 import { cn } from "@/lib/utils";
@@ -47,18 +51,14 @@ export default function DashboardLayout({
     isLoading: isSearchLoading,
     error: searchError,
   } = useSearch(searchQuery);
-  const updateItemMutation = useUpdateItem();
-  const deleteItemMutation = useDeleteItem();
+  const itemOperations = useItemOperations();
   const [folderActionsModal, setFolderActionsModal] = useState<{
     isOpen: boolean;
     folderId: string;
     folderName: string;
   }>({ isOpen: false, folderId: "", folderName: "" });
   const [renameValue, setRenameValue] = useState("");
-  const [uploadingFiles, setUploadingFiles] = useState<
-    { name: string; progress: number; size: string }[]
-  >([]);
-  const [isUploading, setIsUploading] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<UploadProgress[]>([]);
 
   // State for tracking expanded folders
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
@@ -101,22 +101,67 @@ export default function DashboardLayout({
     setRenameValue("");
   };
 
-  const handleRenameFolder = () => {
+  const handleRenameFolder = async () => {
     if (renameValue.trim() && renameValue !== folderActionsModal.folderName) {
-      updateItemMutation.mutate({
-        id: folderActionsModal.folderId,
-        data: { name: renameValue.trim() },
-      });
+      try {
+        await itemOperations.updateItem(folderActionsModal.folderId, {
+          name: renameValue.trim(),
+        });
+      } catch (error) {
+        console.error("Failed to rename folder:", error);
+      }
     }
     closeFolderActions();
   };
 
-  const handleDeleteFolder = () => {
-    deleteItemMutation.mutate({
-      id: folderActionsModal.folderId,
-      permanent: false, // Soft delete by default
-    });
+  const handleDeleteFolder = async () => {
+    try {
+      await itemOperations.delete(folderActionsModal.folderId);
+    } catch (error) {
+      console.error("Failed to delete folder:", error);
+    }
     closeFolderActions();
+  };
+
+  const handleFileUpload = async (
+    files: FileList | File[],
+    parentId?: string,
+  ) => {
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
+
+    // Start upload with progress tracking
+    try {
+      const result = await itemOperations.uploadFiles(
+        fileArray,
+        parentId,
+        (progress) => {
+          setUploadingFiles(progress);
+        },
+      );
+
+      // Show success message
+      setTimeout(() => {
+        alert(
+          `${result.files.length} file(s) disposed successfully! Total size: ${formatFileSize(result.totalSize)}`,
+        );
+      }, 500);
+
+      // Clear upload progress after showing completion briefly
+      setTimeout(() => {
+        setUploadingFiles([]);
+      }, 2000);
+    } catch (error) {
+      console.error("Upload failed:", error);
+
+      // Show error message
+      const errorMessage =
+        error instanceof Error ? error.message : "Upload failed";
+      alert(errorMessage);
+
+      // Clear upload progress
+      setUploadingFiles([]);
+    }
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -125,68 +170,6 @@ export default function DashboardLayout({
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
-
-  const simulateUpload = (file: File) => {
-    return new Promise<void>((resolve) => {
-      const fileInfo = {
-        name: file.name,
-        progress: 0,
-        size: formatFileSize(file.size),
-      };
-
-      setUploadingFiles((prev) => [...prev, fileInfo]);
-
-      const interval = setInterval(() => {
-        setUploadingFiles((prev) =>
-          prev.map((f) =>
-            f.name === file.name
-              ? {
-                  ...f,
-                  progress: Math.min(f.progress + Math.random() * 15 + 5, 100),
-                }
-              : f,
-          ),
-        );
-      }, 200);
-
-      // Complete upload after 2-4 seconds
-      const uploadTime = 2000 + Math.random() * 2000;
-      setTimeout(() => {
-        clearInterval(interval);
-        setUploadingFiles((prev) =>
-          prev.map((f) => (f.name === file.name ? { ...f, progress: 100 } : f)),
-        );
-
-        // Remove from uploading list after showing completion
-        setTimeout(() => {
-          setUploadingFiles((prev) => prev.filter((f) => f.name !== file.name));
-          resolve();
-        }, 1000);
-      }, uploadTime);
-    });
-  };
-
-  const handleFileUpload = async (files: FileList | File[]) => {
-    const fileArray = Array.from(files);
-    if (fileArray.length > 0) {
-      setIsUploading(true);
-
-      // Simulate uploading each file
-      const uploadPromises = fileArray.map((file) => simulateUpload(file));
-
-      try {
-        await Promise.all(uploadPromises);
-        // Show success message briefly
-        setTimeout(() => {
-          alert(`${fileArray.length} file(s) disposed successfully!`);
-        }, 500);
-      } catch (error) {
-        console.error("Upload failed:", error);
-      } finally {
-        setIsUploading(false);
-      }
-    }
   };
 
   const triggerFileUpload = () => {
@@ -295,7 +278,7 @@ export default function DashboardLayout({
 
               {/* File Tree */}
               <div className="px-4 py-2">
-                <div className="mb-3 text-xs font-medium tracking-wider text-gray-400 uppercase">
+                <div className="mb-3 text-xs font-medium uppercase tracking-wider text-gray-400">
                   DISPOSED
                 </div>
                 <div className="space-y-0.5">
@@ -358,7 +341,7 @@ export default function DashboardLayout({
                         )}
                       </div>
                       {item.children && expandedFolders.has(item.id) && (
-                        <div className="mt-0.5 ml-6 space-y-0.5">
+                        <div className="ml-6 mt-0.5 space-y-0.5">
                           {item.children.map((child) => (
                             <div
                               key={child.id}
@@ -456,17 +439,23 @@ export default function DashboardLayout({
 
               {/* Upload Progress */}
               {uploadingFiles.length > 0 && (
-                <div className="absolute right-4 bottom-4 w-80 space-y-2">
+                <div className="absolute bottom-4 right-4 w-80 space-y-2">
                   {uploadingFiles.map((file) => (
                     <div
-                      key={file.name}
+                      key={file.fileName}
                       className="rounded-lg border border-gray-200 bg-white p-4 shadow-lg"
                     >
                       <div className="mb-2 flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                          <Upload className="h-4 w-4 text-green-500" />
+                          {file.status === "error" ? (
+                            <X className="h-4 w-4 text-red-500" />
+                          ) : file.status === "completed" ? (
+                            <Upload className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <Upload className="h-4 w-4 animate-pulse text-blue-500" />
+                          )}
                           <span className="truncate text-sm font-medium text-gray-900">
-                            {file.name}
+                            {file.fileName}
                           </span>
                         </div>
                         <span className="text-xs text-gray-500">
@@ -475,15 +464,34 @@ export default function DashboardLayout({
                       </div>
                       <div className="space-y-1">
                         <div className="flex justify-between text-xs text-gray-500">
-                          <span>Disposing...</span>
+                          <span>
+                            {file.status === "error"
+                              ? "Failed"
+                              : file.status === "completed"
+                                ? "Completed"
+                                : file.status === "processing"
+                                  ? "Processing..."
+                                  : "Uploading..."}
+                          </span>
                           <span>{Math.round(file.progress)}%</span>
                         </div>
                         <div className="h-2 w-full rounded-full bg-gray-200">
                           <div
-                            className="h-2 rounded-full bg-green-500 transition-all duration-300"
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              file.status === "error"
+                                ? "bg-red-500"
+                                : file.status === "completed"
+                                  ? "bg-green-500"
+                                  : "bg-blue-500"
+                            }`}
                             style={{ width: `${file.progress}%` }}
                           />
                         </div>
+                        {file.error && (
+                          <div className="mt-1 text-xs text-red-600">
+                            {file.error}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -520,13 +528,13 @@ export default function DashboardLayout({
             {/* Search Input */}
             <div className="px-6 py-4">
               <div className="relative">
-                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search by name, type, or location..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 py-2.5 pr-4 pl-10 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
                   autoFocus
                 />
               </div>
@@ -666,7 +674,7 @@ export default function DashboardLayout({
                     type="text"
                     value={renameValue}
                     onChange={(e) => setRenameValue(e.target.value)}
-                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
                     placeholder="Enter new folder name"
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {

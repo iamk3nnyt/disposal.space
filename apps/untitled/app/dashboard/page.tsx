@@ -1,20 +1,18 @@
 "use client";
 
-import { useItems } from "@/lib/hooks/use-items";
-import { ArrowUpDown, Upload } from "lucide-react";
+import {
+  useItemOperations,
+  useItems,
+  type UploadProgress,
+} from "@/lib/hooks/use-item-operations";
+import { ArrowUpDown, Download, Eye, Upload } from "lucide-react";
 import { useState } from "react";
 
 export default function Home() {
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [uploadingFiles, setUploadingFiles] = useState<
-    {
-      name: string;
-      progress: number;
-      size: string;
-    }[]
-  >([]);
-  const [isUploading, setIsUploading] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<UploadProgress[]>([]);
+  const itemOperations = useItemOperations();
 
   // Fetch items from API
   const { data: itemsData, isLoading, error } = useItems();
@@ -50,77 +48,53 @@ export default function Home() {
     setIsDragOver(false);
   };
 
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    if (droppedFiles.length === 0) return;
+
+    // Start upload with progress tracking
+    try {
+      const result = await itemOperations.uploadFiles(
+        droppedFiles,
+        undefined,
+        (progress) => {
+          setUploadingFiles(progress);
+        },
+      );
+
+      // Show success message
+      setTimeout(() => {
+        alert(
+          `${result.files.length} file(s) disposed successfully! Total size: ${formatFileSize(result.totalSize)}`,
+        );
+      }, 500);
+
+      // Clear upload progress after showing completion briefly
+      setTimeout(() => {
+        setUploadingFiles([]);
+      }, 2000);
+    } catch (error) {
+      console.error("Upload failed:", error);
+
+      // Show error message
+      const errorMessage =
+        error instanceof Error ? error.message : "Upload failed";
+      alert(errorMessage);
+
+      // Clear upload progress
+      setUploadingFiles([]);
+    }
+  };
+
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
-
-  const simulateUpload = (file: File) => {
-    return new Promise<void>((resolve) => {
-      const fileInfo = {
-        name: file.name,
-        progress: 0,
-        size: formatFileSize(file.size),
-      };
-
-      setUploadingFiles((prev) => [...prev, fileInfo]);
-
-      const interval = setInterval(() => {
-        setUploadingFiles((prev) =>
-          prev.map((f) =>
-            f.name === file.name
-              ? {
-                  ...f,
-                  progress: Math.min(f.progress + Math.random() * 15 + 5, 100),
-                }
-              : f,
-          ),
-        );
-      }, 200);
-
-      // Complete upload after 2-4 seconds
-      const uploadTime = 2000 + Math.random() * 2000;
-      setTimeout(() => {
-        clearInterval(interval);
-        setUploadingFiles((prev) =>
-          prev.map((f) => (f.name === file.name ? { ...f, progress: 100 } : f)),
-        );
-
-        // Remove from uploading list after showing completion
-        setTimeout(() => {
-          setUploadingFiles((prev) => prev.filter((f) => f.name !== file.name));
-          resolve();
-        }, 1000);
-      }, uploadTime);
-    });
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-
-    const droppedFiles = Array.from(e.dataTransfer.files);
-    if (droppedFiles.length > 0) {
-      setIsUploading(true);
-
-      // Simulate uploading each file
-      const uploadPromises = droppedFiles.map((file) => simulateUpload(file));
-
-      try {
-        await Promise.all(uploadPromises);
-        // Show success message briefly
-        setTimeout(() => {
-          alert(`${droppedFiles.length} file(s) disposed successfully!`);
-        }, 500);
-      } catch (error) {
-        console.error("Upload failed:", error);
-      } finally {
-        setIsUploading(false);
-      }
-    }
   };
 
   const getFileIcon = (type: string) => {
@@ -210,6 +184,7 @@ export default function Home() {
                 <th className="pb-3 font-medium">Type</th>
                 <th className="pb-3 font-medium">Size</th>
                 <th className="pb-3 font-medium">Last modified</th>
+                <th className="pb-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -246,6 +221,32 @@ export default function Home() {
                   <td className="py-4 text-sm text-gray-500">
                     {file.lastModified}
                   </td>
+                  <td className="py-4">
+                    {!file.isFolder && (
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() =>
+                            itemOperations.preview(file.id, file.name)
+                          }
+                          disabled={itemOperations.isDownloading}
+                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
+                          title="Preview file"
+                        >
+                          <Eye className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() =>
+                            itemOperations.download(file.id, file.name)
+                          }
+                          disabled={itemOperations.isDownloading}
+                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
+                          title="Download file"
+                        >
+                          <Download className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -257,14 +258,14 @@ export default function Home() {
           <div className="absolute right-4 bottom-4 w-80 space-y-2">
             {uploadingFiles.map((file) => (
               <div
-                key={file.name}
+                key={file.fileName}
                 className="rounded-lg border border-gray-200 bg-white p-4 shadow-lg"
               >
                 <div className="mb-2 flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <Upload className="h-4 w-4 text-green-500" />
                     <span className="truncate text-sm font-medium text-gray-900">
-                      {file.name}
+                      {file.fileName}
                     </span>
                   </div>
                   <span className="text-xs text-gray-500">{file.size}</span>
