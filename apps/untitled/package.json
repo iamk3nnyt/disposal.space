@@ -10,7 +10,11 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6.33.0",
+    "@ketryon/database": "workspace:*",
+    "@neondatabase/serverless": "^0.10.3",
+    "@tanstack/react-query": "^5.90.2",
     "clsx": "^2.1.1",
+    "drizzle-orm": "^0.44.5",
     "lucide-react": "^0.544.0",
     "next": "15.5.4",
     "react": "19.1.0",

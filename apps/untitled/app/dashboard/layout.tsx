@@ -1,5 +1,9 @@
 "use client";
 
+import { useFolderChildren } from "@/lib/hooks/use-folder-children";
+import { useDeleteItem, useItems, useUpdateItem } from "@/lib/hooks/use-items";
+import { useSearch } from "@/lib/hooks/use-search";
+import { useUserStorage } from "@/lib/hooks/use-user-storage";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -34,8 +38,17 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { data: storageData } = useUserStorage();
+  const { data: itemsData } = useItems();
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const {
+    data: searchData,
+    isLoading: isSearchLoading,
+    error: searchError,
+  } = useSearch(searchQuery);
+  const updateItemMutation = useUpdateItem();
+  const deleteItemMutation = useDeleteItem();
   const [folderActionsModal, setFolderActionsModal] = useState<{
     isOpen: boolean;
     folderId: string;
@@ -47,42 +60,35 @@ export default function DashboardLayout({
   >([]);
   const [isUploading, setIsUploading] = useState(false);
 
-  const [sidebarItems, setSidebarItems] = useState<SidebarItem[]>([
-    {
-      id: "old-projects",
-      name: "Old Projects",
-      type: "folder",
-      isActive: true,
-      isExpanded: false,
-    },
-    { id: "random-docs", name: "Random Docs", type: "file" },
-    {
-      id: "maybe-later",
-      name: "Maybe Later",
-      type: "folder",
-      isExpanded: true,
-      children: [
-        { id: "old-resume", name: "old_resume.pdf", type: "file" },
-        { id: "random-notes", name: "random_notes.txt", type: "file" },
-        { id: "maybe-useful", name: "maybe_useful.zip", type: "file" },
-        { id: "forgotten-photos", name: "forgotten_photos", type: "folder" },
-        {
-          id: "old-presentations",
-          name: "old_presentations.pptx",
-          type: "file",
-        },
-        { id: "unused-assets", name: "Unused Assets", type: "folder" },
-        { id: "temp-downloads", name: "Temp Downloads", type: "folder" },
-      ],
-    },
-  ]);
+  // State for tracking expanded folders
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
+    new Set(),
+  );
+
+  // Use TanStack Query to fetch children for expanded folders
+  const expandedFolderIds = Array.from(expandedFolders);
+  const { folderChildren } = useFolderChildren(expandedFolderIds);
+
+  // Convert API data to sidebar format with children support
+  const sidebarItems: SidebarItem[] =
+    itemsData?.items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      type: item.type,
+      isActive: false,
+      children: folderChildren[item.id] || [],
+    })) || [];
 
   const toggleSidebarItem = (itemId: string) => {
-    setSidebarItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId ? { ...item, isExpanded: !item.isExpanded } : item,
-      ),
-    );
+    setExpandedFolders((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
   };
 
   const openFolderActions = (folderId: string, folderName: string) => {
@@ -97,21 +103,19 @@ export default function DashboardLayout({
 
   const handleRenameFolder = () => {
     if (renameValue.trim() && renameValue !== folderActionsModal.folderName) {
-      setSidebarItems((prev) =>
-        prev.map((item) =>
-          item.id === folderActionsModal.folderId
-            ? { ...item, name: renameValue.trim() }
-            : item,
-        ),
-      );
+      updateItemMutation.mutate({
+        id: folderActionsModal.folderId,
+        data: { name: renameValue.trim() },
+      });
     }
     closeFolderActions();
   };
 
   const handleDeleteFolder = () => {
-    setSidebarItems((prev) =>
-      prev.filter((item) => item.id !== folderActionsModal.folderId),
-    );
+    deleteItemMutation.mutate({
+      id: folderActionsModal.folderId,
+      permanent: false, // Soft delete by default
+    });
     closeFolderActions();
   };
 
@@ -198,66 +202,9 @@ export default function DashboardLayout({
     input.click();
   };
 
-  // Mock search results
-  const mockSearchResults = [
-    {
-      id: "1",
-      name: "old_resume.pdf",
-      type: "PDF",
-      size: "2.1MB",
-      location: "Maybe Later",
-      lastModified: "Mar. 15 2024",
-    },
-    {
-      id: "2",
-      name: "random_notes.txt",
-      type: "TXT",
-      size: "45KB",
-      location: "Maybe Later",
-      lastModified: "Jun. 08 2024",
-    },
-    {
-      id: "3",
-      name: "project_proposal.docx",
-      type: "DOCX",
-      size: "1.2MB",
-      location: "Old Projects",
-      lastModified: "Feb. 10 2024",
-    },
-    {
-      id: "4",
-      name: "vacation_photos",
-      type: "folder",
-      size: "",
-      location: "Random Docs",
-      lastModified: "Dec. 03 2023",
-    },
-    {
-      id: "5",
-      name: "maybe_useful.zip",
-      type: "ZIP",
-      size: "156MB",
-      location: "Maybe Later",
-      lastModified: "Jan. 22 2024",
-    },
-    {
-      id: "6",
-      name: "old_presentations.pptx",
-      type: "PPTX",
-      size: "89MB",
-      location: "Maybe Later",
-      lastModified: "Nov. 14 2023",
-    },
-  ];
-
-  const filteredResults = searchQuery
-    ? mockSearchResults.filter(
-        (item) =>
-          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.location.toLowerCase().includes(searchQuery.toLowerCase()),
-      )
-    : mockSearchResults;
+  // Use real search results from API
+  const searchResults = searchData?.items || [];
+  const filteredResults = searchResults;
 
   const getFileIcon = (type: string) => {
     switch (type) {
@@ -401,14 +348,16 @@ export default function DashboardLayout({
                             >
                               <ChevronRight
                                 className={`h-3 w-3 transition-transform ${
-                                  item.isExpanded ? "rotate-90" : ""
+                                  expandedFolders.has(item.id)
+                                    ? "rotate-90"
+                                    : ""
                                 }`}
                               />
                             </button>
                           </div>
                         )}
                       </div>
-                      {item.children && item.isExpanded && (
+                      {item.children && expandedFolders.has(item.id) && (
                         <div className="mt-0.5 ml-6 space-y-0.5">
                           {item.children.map((child) => (
                             <div
@@ -435,14 +384,22 @@ export default function DashboardLayout({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <span>Storage Used</span>
-                    <span>2.4 GB of 15 GB</span>
+                    <span>
+                      {storageData?.user.storageUsedFormatted || "0 Bytes"} of{" "}
+                      {storageData?.user.storageLimitFormatted || "5 GB"}
+                    </span>
                   </div>
                   <div className="h-1.5 w-full rounded-full bg-gray-200">
-                    <div className="h-1.5 w-1/6 rounded-full bg-green-500"></div>
+                    <div
+                      className="h-1.5 rounded-full bg-green-500 transition-all duration-300"
+                      style={{
+                        width: `${storageData?.user.storageUsedPercentage || 0}%`,
+                      }}
+                    ></div>
                   </div>
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <span>Items Disposed</span>
-                    <span>247</span>
+                    <span>{storageData?.stats.totalItems || 0}</span>
                   </div>
                 </div>
               </div>
@@ -577,7 +534,29 @@ export default function DashboardLayout({
 
             {/* Search Results */}
             <div className="max-h-80 overflow-y-auto">
-              {filteredResults.length > 0 ? (
+              {isSearchLoading ? (
+                <div className="px-6 py-12 text-center">
+                  <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900"></div>
+                  <h3 className="mt-3 text-sm font-medium text-gray-900">
+                    Searching...
+                  </h3>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Finding your disposed items
+                  </p>
+                </div>
+              ) : searchError ? (
+                <div className="px-6 py-12 text-center">
+                  <div className="mx-auto h-8 w-8 text-red-500">⚠️</div>
+                  <h3 className="mt-3 text-sm font-medium text-gray-900">
+                    Search failed
+                  </h3>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {searchError instanceof Error
+                      ? searchError.message
+                      : "Something went wrong"}
+                  </p>
+                </div>
+              ) : filteredResults.length > 0 ? (
                 <div className="divide-y divide-gray-100">
                   {filteredResults.map((item) => (
                     <div
@@ -597,7 +576,7 @@ export default function DashboardLayout({
                             {item.name}
                           </div>
                           <div className="truncate text-xs text-gray-500">
-                            in {item.location} • {item.lastModified}
+                            in {item.path} • {item.lastModified}
                           </div>
                         </div>
                       </div>
@@ -634,7 +613,11 @@ export default function DashboardLayout({
             {/* Modal Footer */}
             <div className="flex items-center justify-between border-t border-gray-200 px-6 py-3">
               <span className="text-xs text-gray-500">
-                {filteredResults.length} items found
+                {isSearchLoading
+                  ? "Searching..."
+                  : searchError
+                    ? "Search failed"
+                    : `${filteredResults.length} items found`}
               </span>
               <span className="text-xs text-gray-400">Press ESC to close</span>
             </div>

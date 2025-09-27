@@ -1,5 +1,6 @@
 "use client";
 
+import { useItems } from "@/lib/hooks/use-items";
 import { ArrowUpDown, Upload } from "lucide-react";
 import { useState } from "react";
 
@@ -15,64 +16,9 @@ export default function Home() {
   >([]);
   const [isUploading, setIsUploading] = useState(false);
 
-  const files = [
-    {
-      id: "1",
-      name: "old_resume.pdf",
-      type: "PDF",
-      size: "2.1MB",
-      lastModified: "Mar. 15 2024",
-    },
-    {
-      id: "2",
-      name: "random_notes.txt",
-      type: "TXT",
-      size: "45KB",
-      lastModified: "Jun. 08 2024",
-    },
-    {
-      id: "3",
-      name: "maybe_useful.zip",
-      type: "ZIP",
-      size: "156MB",
-      lastModified: "Jan. 22 2024",
-    },
-    {
-      id: "4",
-      name: "forgotten_photos",
-      type: "folder",
-      size: "",
-      lastModified: "Dec. 03 2023",
-    },
-    {
-      id: "5",
-      name: "old_presentations.pptx",
-      type: "PPTX",
-      size: "89MB",
-      lastModified: "Nov. 14 2023",
-    },
-    {
-      id: "6",
-      name: "temp_download.dmg",
-      type: "DMG",
-      size: "1.2GB",
-      lastModified: "Aug. 29 2024",
-    },
-    {
-      id: "7",
-      name: "unused_assets",
-      type: "folder",
-      size: "",
-      lastModified: "May. 17 2024",
-    },
-    {
-      id: "8",
-      name: "Town hall",
-      type: "PAGE",
-      size: "5.6GB",
-      lastModified: "Sep. 26 2025",
-    },
-  ];
+  // Fetch items from API
+  const { data: itemsData, isLoading, error } = useItems();
+  const files = itemsData?.items || [];
 
   const toggleFileSelection = (fileId: string) => {
     setSelectedFiles((prev) =>
@@ -199,6 +145,37 @@ export default function Home() {
         return "📄";
     }
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex h-full flex-1 items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900"></div>
+          <p className="text-sm text-gray-500">
+            Loading your disposal space...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex h-full flex-1 items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-12 w-12 text-red-500">⚠️</div>
+          <h3 className="mb-2 text-lg font-medium text-gray-900">
+            Failed to load items
+          </h3>
+          <p className="text-sm text-gray-500">
+            {error instanceof Error ? error.message : "Something went wrong"}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
