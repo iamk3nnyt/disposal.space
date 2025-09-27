@@ -7,6 +7,7 @@ import {
 } from "@/lib/hooks/use-item-operations";
 import { ArrowUpDown, Download, Eye, Upload } from "lucide-react";
 import { useState } from "react";
+import toast from "react-hot-toast";
 
 export default function Home() {
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
@@ -67,7 +68,7 @@ export default function Home() {
 
       // Show success message
       setTimeout(() => {
-        alert(
+        toast.success(
           `${result.files.length} file(s) disposed successfully! Total size: ${formatFileSize(result.totalSize)}`,
         );
       }, 500);
@@ -82,7 +83,7 @@ export default function Home() {
       // Show error message
       const errorMessage =
         error instanceof Error ? error.message : "Upload failed";
-      alert(errorMessage);
+      toast.error(errorMessage);
 
       // Clear upload progress
       setUploadingFiles([]);
@@ -155,7 +156,7 @@ export default function Home() {
     <>
       {/* File List */}
       <div
-        className="relative flex-1 overflow-auto py-3 pr-6 pl-3"
+        className="relative flex-1 overflow-auto py-3 pl-3 pr-6"
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -225,11 +226,11 @@ export default function Home() {
                     {!file.isFolder && (
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() =>
-                            itemOperations.preview(file.id, file.name)
-                          }
+                          onClick={async () => {
+                            await itemOperations.preview(file.id, file.name);
+                          }}
                           disabled={itemOperations.isDownloading}
-                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
+                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50"
                           title="Preview file"
                         >
                           <Eye className="h-3 w-3" />
@@ -239,7 +240,7 @@ export default function Home() {
                             itemOperations.download(file.id, file.name)
                           }
                           disabled={itemOperations.isDownloading}
-                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
+                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50"
                           title="Download file"
                         >
                           <Download className="h-3 w-3" />
@@ -255,7 +256,7 @@ export default function Home() {
 
         {/* Upload Progress */}
         {uploadingFiles.length > 0 && (
-          <div className="absolute right-4 bottom-4 w-80 space-y-2">
+          <div className="absolute bottom-4 right-4 w-80 space-y-2">
             {uploadingFiles.map((file) => (
               <div
                 key={file.fileName}
@@ -289,7 +290,7 @@ export default function Home() {
 
         {/* Drag Overlay */}
         {isDragOver && (
-          <div className="bg-opacity-90 absolute inset-0 flex items-center justify-center rounded-lg border-2 border-dashed border-green-300 bg-green-50">
+          <div className="absolute inset-0 flex items-center justify-center rounded-lg border-2 border-dashed border-green-300 bg-green-50 bg-opacity-90">
             <div className="text-center">
               <Upload className="mx-auto mb-4 h-12 w-12 text-green-500" />
               <h3 className="mb-2 text-lg font-medium text-green-700">

@@ -145,7 +145,7 @@ export default function Home() {
               <div className="h-[600px] w-[1200px] overflow-hidden rounded-2xl border border-gray-200 bg-white">
                 {/* Mock Sidebar and Content */}
                 <div className="flex h-full">
-                  <div className="flex w-64 flex-col border-r border-gray-200 bg-gray-50">
+                  <div className="flex w-64 shrink-0 flex-col border-r border-gray-200 bg-gray-50">
                     {/* Sidebar Header */}
                     <div className="flex h-16 items-center border-b border-gray-200 px-4">
                       <div className="flex items-center space-x-3">

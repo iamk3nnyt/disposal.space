@@ -11,10 +11,12 @@ import { useUserStorage } from "@/lib/hooks/use-user-storage";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
+  ChevronDown,
   ChevronRight,
   Edit3,
   File,
   Folder,
+  FolderPlus,
   MoreHorizontal,
   Plus,
   Search,
@@ -26,6 +28,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 
 type SidebarItem = {
   id: string;
@@ -59,6 +62,9 @@ export default function DashboardLayout({
   }>({ isOpen: false, folderId: "", folderName: "" });
   const [renameValue, setRenameValue] = useState("");
   const [uploadingFiles, setUploadingFiles] = useState<UploadProgress[]>([]);
+  const [isUploadDropdownOpen, setIsUploadDropdownOpen] = useState(false);
+  const [isHeaderUploadDropdownOpen, setIsHeaderUploadDropdownOpen] =
+    useState(false);
 
   // State for tracking expanded folders
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
@@ -107,8 +113,10 @@ export default function DashboardLayout({
         await itemOperations.updateItem(folderActionsModal.folderId, {
           name: renameValue.trim(),
         });
+        // Toast notification is handled by the useItemUpdate hook
       } catch (error) {
         console.error("Failed to rename folder:", error);
+        // Error toast is also handled by the useItemUpdate hook
       }
     }
     closeFolderActions();
@@ -117,8 +125,10 @@ export default function DashboardLayout({
   const handleDeleteFolder = async () => {
     try {
       await itemOperations.delete(folderActionsModal.folderId);
+      // Toast notification is handled by the useItemDelete hook
     } catch (error) {
       console.error("Failed to delete folder:", error);
+      // Error toast is also handled by the useItemDelete hook
     }
     closeFolderActions();
   };
@@ -142,7 +152,7 @@ export default function DashboardLayout({
 
       // Show success message
       setTimeout(() => {
-        alert(
+        toast.success(
           `${result.files.length} file(s) disposed successfully! Total size: ${formatFileSize(result.totalSize)}`,
         );
       }, 500);
@@ -157,7 +167,7 @@ export default function DashboardLayout({
       // Show error message
       const errorMessage =
         error instanceof Error ? error.message : "Upload failed";
-      alert(errorMessage);
+      toast.error(errorMessage);
 
       // Clear upload progress
       setUploadingFiles([]);
@@ -172,14 +182,23 @@ export default function DashboardLayout({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  const triggerFileUpload = () => {
+  const triggerFileUpload = (uploadFolders = false, parentId?: string) => {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
+
+    // Enable folder upload if requested
+    if (uploadFolders) {
+      input.webkitdirectory = true;
+      // Add additional attributes for better browser support
+      input.setAttribute("directory", "");
+      input.setAttribute("mozdirectory", "");
+    }
+
     input.onchange = (e) => {
       const target = e.target as HTMLInputElement;
       if (target.files) {
-        handleFileUpload(target.files);
+        handleFileUpload(target.files, parentId);
       }
     };
     input.click();
@@ -188,6 +207,20 @@ export default function DashboardLayout({
   // Use real search results from API
   const searchResults = searchData?.items || [];
   const filteredResults = searchResults;
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest(".upload-dropdown")) {
+        setIsUploadDropdownOpen(false);
+        setIsHeaderUploadDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const getFileIcon = (type: string) => {
     switch (type) {
@@ -232,7 +265,7 @@ export default function DashboardLayout({
         <div className="h-full overflow-x-auto overflow-y-hidden">
           <div className="flex h-full">
             {/* Sidebar */}
-            <div className="flex h-full w-64 flex-col border-r border-gray-200 bg-gray-50">
+            <div className="flex h-full w-64 shrink-0 flex-col border-r border-gray-200 bg-gray-50">
               {/* Sidebar Header */}
               <div className="flex h-16 items-center border-b border-gray-200 px-4">
                 <div className="flex items-center space-x-3">
@@ -248,13 +281,52 @@ export default function DashboardLayout({
 
               {/* Navigation */}
               <div className="space-y-1 px-4 py-3">
-                <button
-                  onClick={triggerFileUpload}
-                  className="flex w-full items-center space-x-2 rounded-md px-2 py-1 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  <Upload className="h-4 w-4" />
-                  <span>Upload</span>
-                </button>
+                {/* Upload Dropdown */}
+                <div className="upload-dropdown relative">
+                  <button
+                    onClick={() =>
+                      setIsUploadDropdownOpen(!isUploadDropdownOpen)
+                    }
+                    className="flex w-full items-center justify-between rounded-md px-2 py-1 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Upload className="h-4 w-4" />
+                      <span>Upload</span>
+                    </div>
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 transition-transform",
+                        isUploadDropdownOpen && "rotate-180",
+                      )}
+                    />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {isUploadDropdownOpen && (
+                    <div className="absolute top-full left-0 z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
+                      <button
+                        onClick={() => {
+                          triggerFileUpload(false);
+                          setIsUploadDropdownOpen(false);
+                        }}
+                        className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        <File className="h-4 w-4" />
+                        <span>Upload Files</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          triggerFileUpload(true);
+                          setIsUploadDropdownOpen(false);
+                        }}
+                        className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        <FolderPlus className="h-4 w-4" />
+                        <span>Upload Folder</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() => setIsSearchModalOpen(true)}
                   className="flex w-full items-center space-x-2 rounded-md px-2 py-1 text-sm text-gray-700 hover:bg-gray-100"
@@ -278,7 +350,7 @@ export default function DashboardLayout({
 
               {/* File Tree */}
               <div className="px-4 py-2">
-                <div className="mb-3 text-xs font-medium uppercase tracking-wider text-gray-400">
+                <div className="mb-3 text-xs font-medium tracking-wider text-gray-400 uppercase">
                   DISPOSED
                 </div>
                 <div className="space-y-0.5">
@@ -317,8 +389,9 @@ export default function DashboardLayout({
                               className="rounded p-0.5 hover:bg-gray-200"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                triggerFileUpload();
+                                triggerFileUpload(false, item.id);
                               }}
+                              title="Upload files to this folder"
                             >
                               <Plus className="h-3 w-3" />
                             </button>
@@ -341,7 +414,7 @@ export default function DashboardLayout({
                         )}
                       </div>
                       {item.children && expandedFolders.has(item.id) && (
-                        <div className="ml-6 mt-0.5 space-y-0.5">
+                        <div className="mt-0.5 ml-6 space-y-0.5">
                           {item.children.map((child) => (
                             <div
                               key={child.id}
@@ -425,12 +498,51 @@ export default function DashboardLayout({
                     >
                       Settings
                     </Link>
-                    <button
-                      onClick={triggerFileUpload}
-                      className="rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-800"
-                    >
-                      Upload
-                    </button>
+                    {/* Header Upload Dropdown */}
+                    <div className="upload-dropdown relative">
+                      <button
+                        onClick={() =>
+                          setIsHeaderUploadDropdownOpen(
+                            !isHeaderUploadDropdownOpen,
+                          )
+                        }
+                        className="flex items-center space-x-1 rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-800"
+                      >
+                        <span>Upload</span>
+                        <ChevronDown
+                          className={cn(
+                            "h-3 w-3 transition-transform",
+                            isHeaderUploadDropdownOpen && "rotate-180",
+                          )}
+                        />
+                      </button>
+
+                      {/* Header Dropdown Menu */}
+                      {isHeaderUploadDropdownOpen && (
+                        <div className="absolute top-full right-0 z-10 mt-1 w-40 rounded-md border border-gray-200 bg-white shadow-lg">
+                          <button
+                            onClick={() => {
+                              triggerFileUpload(false);
+                              setIsHeaderUploadDropdownOpen(false);
+                            }}
+                            className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          >
+                            <File className="h-4 w-4" />
+                            <span>Upload Files</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              triggerFileUpload(true);
+                              setIsHeaderUploadDropdownOpen(false);
+                            }}
+                            className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          >
+                            <FolderPlus className="h-4 w-4" />
+                            <span>Upload Folder</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -439,7 +551,7 @@ export default function DashboardLayout({
 
               {/* Upload Progress */}
               {uploadingFiles.length > 0 && (
-                <div className="absolute bottom-4 right-4 w-80 space-y-2">
+                <div className="absolute right-4 bottom-4 w-80 space-y-2">
                   {uploadingFiles.map((file) => (
                     <div
                       key={file.fileName}
@@ -464,26 +576,12 @@ export default function DashboardLayout({
                       </div>
                       <div className="space-y-1">
                         <div className="flex justify-between text-xs text-gray-500">
-                          <span>
-                            {file.status === "error"
-                              ? "Failed"
-                              : file.status === "completed"
-                                ? "Completed"
-                                : file.status === "processing"
-                                  ? "Processing..."
-                                  : "Uploading..."}
-                          </span>
+                          <span>Disposing...</span>
                           <span>{Math.round(file.progress)}%</span>
                         </div>
                         <div className="h-2 w-full rounded-full bg-gray-200">
                           <div
-                            className={`h-2 rounded-full transition-all duration-300 ${
-                              file.status === "error"
-                                ? "bg-red-500"
-                                : file.status === "completed"
-                                  ? "bg-green-500"
-                                  : "bg-blue-500"
-                            }`}
+                            className="h-2 rounded-full bg-green-500 transition-all duration-300"
                             style={{ width: `${file.progress}%` }}
                           />
                         </div>
@@ -528,13 +626,13 @@ export default function DashboardLayout({
             {/* Search Input */}
             <div className="px-6 py-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search by name, type, or location..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                  className="w-full rounded-lg border border-gray-300 py-2.5 pr-4 pl-10 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
                   autoFocus
                 />
               </div>
@@ -674,7 +772,7 @@ export default function DashboardLayout({
                     type="text"
                     value={renameValue}
                     onChange={(e) => setRenameValue(e.target.value)}
-                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
                     placeholder="Enter new folder name"
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {

@@ -135,6 +135,77 @@ async function handleFileUpload(
   const uploadResults = [];
   let totalSize = 0;
 
+  // Create a map to store created folders to avoid duplicates
+  const createdFolders = new Map<string, string>();
+
+  // Helper function to create folder hierarchy
+  const createFolderHierarchy = async (
+    relativePath: string,
+    userId: string,
+    rootParentId: string | null,
+  ): Promise<string | null> => {
+    const pathParts = relativePath.split("/").filter((part) => part.length > 0);
+
+    // If no path parts, return the root parent
+    if (pathParts.length === 0) return rootParentId;
+
+    // Remove the filename (last part) to get folder path
+    const folderParts = pathParts.slice(0, -1);
+    if (folderParts.length === 0) return rootParentId;
+
+    let currentParentId = rootParentId;
+    let currentPath = "";
+
+    for (const folderName of folderParts) {
+      currentPath = currentPath ? `${currentPath}/${folderName}` : folderName;
+
+      // Check if we already created this folder
+      if (createdFolders.has(currentPath)) {
+        currentParentId = createdFolders.get(currentPath)!;
+        continue;
+      }
+
+      // Check if folder already exists in database
+      const [existingFolder] = await db
+        .select()
+        .from(items)
+        .where(
+          and(
+            eq(items.userId, userId),
+            currentParentId
+              ? eq(items.parentId, currentParentId)
+              : isNull(items.parentId),
+            eq(items.name, folderName),
+            eq(items.type, "folder"),
+            eq(items.isDeleted, false),
+          ),
+        )
+        .limit(1);
+
+      if (existingFolder) {
+        currentParentId = existingFolder.id;
+        createdFolders.set(currentPath, existingFolder.id);
+      } else {
+        // Create new folder
+        const [newFolder] = await db
+          .insert(items)
+          .values({
+            userId,
+            parentId: currentParentId,
+            name: folderName,
+            type: "folder",
+            sizeBytes: 0,
+          })
+          .returning();
+
+        currentParentId = newFolder.id;
+        createdFolders.set(currentPath, newFolder.id);
+      }
+    }
+
+    return currentParentId;
+  };
+
   // Process each file
   for (const file of files) {
     try {
@@ -150,6 +221,18 @@ async function handleFileUpload(
           { status: 413 },
         );
       }
+
+      // Get the relative path from webkitdirectory uploads
+      const relativePath =
+        (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
+        file.name;
+
+      // Create folder hierarchy if needed
+      const fileParentId = await createFolderHierarchy(
+        relativePath,
+        user.id,
+        parentId,
+      );
 
       // Convert File to Buffer
       const arrayBuffer = await file.arrayBuffer();
@@ -171,7 +254,7 @@ async function handleFileUpload(
         .insert(items)
         .values({
           userId: user.id,
-          parentId: parentId || null,
+          parentId: fileParentId,
           name: file.name,
           type: "file",
           fileType: fileExtension,

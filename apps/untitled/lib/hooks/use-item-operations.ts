@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 
 // Types
 export interface ItemDownloadResponse {
@@ -173,10 +174,18 @@ export function useItemDownload() {
       // Automatically trigger download if download option is true
       if (variables.options?.download !== false) {
         triggerDownload(blob, variables.fileName);
+        toast.success(`Downloaded "${variables.fileName}"`);
+      } else if (variables.options?.preview) {
+        toast.success(`Preview ready for "${variables.fileName}"`);
       }
     },
-    onError: (error) => {
+    onError: (error, variables) => {
       console.error("Download failed:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Download failed";
+      toast.error(
+        `Failed to download "${variables.fileName}": ${errorMessage}`,
+      );
     },
   });
 }
@@ -212,13 +221,22 @@ export function useItemDelete() {
     }
   >({
     mutationFn: ({ itemId, permanent }) => deleteItem(itemId, permanent),
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       // Invalidate items queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["userStorage"] });
+
+      // Show success message (this will be overridden by specific folder/file messages)
+      const action = variables.permanent
+        ? "permanently deleted"
+        : "moved to trash";
+      toast.success(`Item ${action} successfully`);
     },
     onError: (error) => {
       console.error("Delete failed:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Delete failed";
+      toast.error(errorMessage);
     },
   });
 }
@@ -526,12 +544,22 @@ export function useItemUpdate() {
     }
   >({
     mutationFn: ({ id, data }) => updateItem(id, data),
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
       // Invalidate items queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ["items"] });
+
+      // Show success message
+      if (variables.data.name) {
+        toast.success(`Item renamed to "${variables.data.name}"`);
+      } else {
+        toast.success("Item updated successfully");
+      }
     },
     onError: (error) => {
       console.error("Update failed:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Update failed";
+      toast.error(errorMessage);
     },
   });
 }
@@ -549,12 +577,20 @@ export function useItemCreate() {
     }
   >({
     mutationFn: ({ name, parentId }) => createFolder(name, parentId),
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
       // Invalidate items queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ["items"] });
+
+      // Show success message
+      toast.success(`Folder "${variables.name}" created successfully`);
     },
-    onError: (error) => {
+    onError: (error, variables) => {
       console.error("Create folder failed:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to create folder";
+      toast.error(
+        `Failed to create folder "${variables.name}": ${errorMessage}`,
+      );
     },
   });
 }
@@ -599,13 +635,19 @@ export function useItemOperations() {
       });
     },
 
-    // Preview item (get URL without downloading)
-    preview: (itemId: string, fileName: string) => {
-      return downloadMutation.mutateAsync({
-        itemId,
-        fileName,
-        options: { preview: true, download: false },
-      });
+    // Preview item (get URL and open in new tab)
+    preview: async (itemId: string, fileName: string) => {
+      try {
+        const previewData = await getItemPreviewUrl(itemId);
+        // Open the presigned URL in a new tab for preview
+        window.open(previewData.url, "_blank", "noopener,noreferrer");
+        toast.success(`Preview opened for "${fileName}"`);
+      } catch (error) {
+        console.error("Preview failed:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : "Preview failed";
+        toast.error(`Failed to preview "${fileName}": ${errorMessage}`);
+      }
     },
 
     // Delete item (soft delete)
