@@ -8,7 +8,7 @@ import {
 } from "@/lib/hooks/use-item-operations";
 import { useSearch } from "@/lib/hooks/use-search";
 import { useUserStorage } from "@/lib/hooks/use-user-storage";
-import { cn, formatFileSize } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
   ChevronDown,
@@ -165,14 +165,7 @@ export default function DashboardLayout({
 
     toast.promise(deletePromise, {
       loading: `Deleting "${folderActionsModal.folderName}" and all its contents...`,
-      success: (result) => {
-        let message = `Folder "${folderActionsModal.folderName}" deleted successfully!`;
-        if (result.sizeFreed && result.sizeFreed > 0) {
-          const sizeFreedFormatted = formatFileSize(result.sizeFreed);
-          message += ` • ${sizeFreedFormatted} of storage freed`;
-        }
-        return message;
-      },
+      success: `"${folderActionsModal.folderName}" deleted successfully`,
       error: (err) =>
         `Failed to delete folder: ${err instanceof Error ? err.message : "Unknown error"}`,
     });
@@ -189,19 +182,13 @@ export default function DashboardLayout({
 
     // Start upload with progress tracking
     try {
-      const result = await itemOperations.uploadFiles(
-        fileArray,
-        parentId,
-        (progress) => {
-          setUploadingFiles(progress);
-        },
-      );
+      await itemOperations.uploadFiles(fileArray, parentId, (progress) => {
+        setUploadingFiles(progress);
+      });
 
       // Show success message
       setTimeout(() => {
-        toast.success(
-          `${result.files.length} file(s) disposed successfully! Total size: ${formatFileSize(result.totalSize)}`,
-        );
+        toast.success(`Files disposed successfully!`);
       }, 500);
 
       // Clear upload progress after showing completion briefly

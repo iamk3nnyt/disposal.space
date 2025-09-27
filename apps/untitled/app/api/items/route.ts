@@ -258,24 +258,25 @@ async function handleFileUploadWithSSE(
           },
         });
 
+        // Calculate total size of all files to check if batch would exceed limit
+        const totalBatchSize = files.reduce((sum, file) => sum + file.size, 0);
+        if (user.storageUsed + totalBatchSize > user.storageLimit) {
+          sendSSEEvent({
+            category: "upload",
+            type: "error",
+            data: {
+              message: `Storage limit exceeded. Uploading ${files.length} file(s) would exceed your ${Math.round(user.storageLimit / (1024 * 1024 * 1024))}GB limit. Available space: ${formatFileSize(user.storageLimit - user.storageUsed)}.`,
+            },
+          });
+          controller.close();
+          return;
+        }
+
         // Process each file
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
 
           try {
-            // Check storage limit before processing
-            if (user.storageUsed + file.size > user.storageLimit) {
-              sendSSEEvent({
-                category: "upload",
-                type: "error",
-                data: {
-                  message: `Storage limit exceeded. File "${file.name}" would exceed your ${Math.round(user.storageLimit / (1024 * 1024 * 1024))}GB limit.`,
-                },
-              });
-              controller.close();
-              return;
-            }
-
             // Progress: File validation
             const baseProgress = (i / files.length) * 80; // Reserve 80% for file processing
             sendSSEEvent({
@@ -550,23 +551,25 @@ async function handleFileUpload(
     return currentParentId;
   };
 
+  // Calculate total size of all files to check if batch would exceed limit
+  const totalBatchSize = files.reduce((sum, file) => sum + file.size, 0);
+  if (user.storageUsed + totalBatchSize > user.storageLimit) {
+    return NextResponse.json(
+      {
+        error: `Storage limit exceeded. Uploading ${files.length} file(s) would exceed your ${Math.round(user.storageLimit / (1024 * 1024 * 1024))}GB limit. Available space: ${formatFileSize(user.storageLimit - user.storageUsed)}.`,
+        currentUsage: user.storageUsed,
+        limit: user.storageLimit,
+        totalBatchSize,
+        availableSpace: user.storageLimit - user.storageUsed,
+      },
+      { status: 413 },
+    );
+  }
+
   // Process each file
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     try {
-      // Check storage limit before processing
-      if (user.storageUsed + file.size > user.storageLimit) {
-        return NextResponse.json(
-          {
-            error: `Storage limit exceeded. File "${file.name}" would exceed your ${Math.round(user.storageLimit / (1024 * 1024 * 1024))}GB limit.`,
-            currentUsage: user.storageUsed,
-            limit: user.storageLimit,
-            fileSize: file.size,
-          },
-          { status: 413 },
-        );
-      }
-
       // Get the relative path from webkitdirectory uploads
       const relativePath =
         (file as File & { webkitRelativePath?: string }).webkitRelativePath ||

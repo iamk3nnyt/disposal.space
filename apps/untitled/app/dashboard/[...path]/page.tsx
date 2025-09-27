@@ -48,7 +48,6 @@ export default function FolderNavigationPage({
   const itemOperations = useItemOperations();
 
   const isLoading = isLoadingPath || isLoadingItems;
-  const currentFolderName = folderData?.folderName || "Dashboard";
 
   const toggleFileSelection = (fileId: string) => {
     setSelectedFiles((prev) =>
@@ -91,7 +90,7 @@ export default function FolderNavigationPage({
 
     // Start upload with progress tracking
     try {
-      const result = await itemOperations.uploadFiles(
+      await itemOperations.uploadFiles(
         droppedFiles,
         folderData?.folderId || undefined,
         (progress) => {
@@ -101,9 +100,7 @@ export default function FolderNavigationPage({
 
       // Show success message
       setTimeout(() => {
-        toast.success(
-          `${result.files.length} file(s) disposed successfully! Total size: ${formatFileSize(result.totalSize)}`,
-        );
+        toast.success(`Files disposed successfully!`);
       }, 500);
 
       // Clear upload progress after showing completion briefly
@@ -121,14 +118,6 @@ export default function FolderNavigationPage({
       // Clear upload progress
       setUploadingFiles([]);
     }
-  };
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   const getFileIcon = (type: string) => {
@@ -338,16 +327,7 @@ export default function FolderNavigationPage({
                             );
                             toast.promise(deletePromise, {
                               loading: `Deleting "${file.name}"...`,
-                              success: (result) => {
-                                let message = "Item deleted successfully";
-                                if (result.sizeFreed && result.sizeFreed > 0) {
-                                  const sizeFreedFormatted = formatFileSize(
-                                    result.sizeFreed,
-                                  );
-                                  message += ` • ${sizeFreedFormatted} of storage freed`;
-                                }
-                                return message;
-                              },
+                              success: `"${file.name}" deleted successfully`,
                               error: (err) =>
                                 err instanceof Error
                                   ? err.message

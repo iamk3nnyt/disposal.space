@@ -169,7 +169,7 @@ export function useItemDownload() {
         triggerDownload(blob, variables.fileName);
       }
     },
-    onError: (error, variables) => {
+    onError: (error) => {
       console.error("Download failed:", error);
     },
   });
@@ -281,21 +281,9 @@ export function useItemPreviewUrl(itemId: string, enabled = true) {
 }
 
 // Types for upload response
-interface UploadFileResult {
-  file: ItemResponse["item"];
-  s3Key: string;
-  s3Url: string;
-  category: string;
-  size: number;
-  mimeType: string;
-}
 
 interface UploadResponse {
-  message: string;
-  files: UploadFileResult[];
-  totalSize: number;
-  newStorageUsed: number;
-  storageLimit: number;
+  success: boolean;
 }
 
 // Fetch items from API
@@ -344,6 +332,8 @@ async function uploadFilesWithProgress(
   parentId?: string,
   onProgress?: (progress: UploadProgress[]) => void,
 ): Promise<UploadResponse> {
+  // Note: Storage limit validation is handled by the backend
+
   const formData = new FormData();
 
   // Add files to form data
@@ -381,7 +371,6 @@ async function uploadFilesWithProgress(
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    let finalResult: UploadResponse | null = null;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -422,15 +411,6 @@ async function uploadFilesWithProgress(
                 }));
 
                 onProgress?.(completedProgress);
-
-                // Create final result from event data
-                finalResult = {
-                  files: [], // Will be populated from actual response
-                  totalSize: eventData.data.totalSize || 0,
-                  message: eventData.data.message || "Upload completed",
-                  newStorageUsed: 0, // Will be calculated
-                  storageLimit: 0, // Will be populated
-                };
               } else if (eventData.type === "error") {
                 // Mark as error
                 const errorProgress = initialProgress.map((item) => ({
@@ -450,16 +430,8 @@ async function uploadFilesWithProgress(
       }
     }
 
-    // Return the final result or a default response
-    return (
-      finalResult || {
-        files: [],
-        totalSize: 0,
-        message: "Upload completed",
-        newStorageUsed: 0,
-        storageLimit: 0,
-      }
-    );
+    // Return simplified success response
+    return { success: true };
   } catch (error) {
     // Mark as error
     const errorProgress = initialProgress.map((item) => ({
@@ -591,13 +563,13 @@ export function useItemCreate() {
     }
   >({
     mutationFn: ({ name, parentId }) => createFolder(name, parentId),
-    onSuccess: (response, variables) => {
+    onSuccess: () => {
       // Invalidate all relevant queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["folderChildren"] });
       queryClient.invalidateQueries({ queryKey: ["search"] });
     },
-    onError: (error, variables) => {
+    onError: (error) => {
       console.error("Create folder failed:", error);
     },
   });

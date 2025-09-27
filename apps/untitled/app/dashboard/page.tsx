@@ -5,7 +5,6 @@ import {
   useItems,
   type UploadProgress,
 } from "@/lib/hooks/use-item-operations";
-import { formatFileSize } from "@/lib/utils";
 import { ArrowUpDown, Download, Eye, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -60,19 +59,13 @@ export default function Home() {
 
     // Start upload with progress tracking
     try {
-      const result = await itemOperations.uploadFiles(
-        droppedFiles,
-        undefined,
-        (progress) => {
-          setUploadingFiles(progress);
-        },
-      );
+      await itemOperations.uploadFiles(droppedFiles, undefined, (progress) => {
+        setUploadingFiles(progress);
+      });
 
       // Show success message
       setTimeout(() => {
-        toast.success(
-          `${result.files.length} file(s) disposed successfully! Total size: ${formatFileSize(result.totalSize)}`,
-        );
+        toast.success(`Files disposed successfully!`);
       }, 500);
 
       // Clear upload progress after showing completion briefly
@@ -273,16 +266,7 @@ export default function Home() {
                             );
                             toast.promise(deletePromise, {
                               loading: `Deleting "${file.name}"...`,
-                              success: (result) => {
-                                let message = "Item deleted successfully";
-                                if (result.sizeFreed && result.sizeFreed > 0) {
-                                  const sizeFreedFormatted = formatFileSize(
-                                    result.sizeFreed,
-                                  );
-                                  message += ` • ${sizeFreedFormatted} of storage freed`;
-                                }
-                                return message;
-                              },
+                              success: `"${file.name}" deleted successfully`,
                               error: (err) =>
                                 err instanceof Error
                                   ? err.message
