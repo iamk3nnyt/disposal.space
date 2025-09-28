@@ -1,11 +1,12 @@
 "use client";
 
+import { getFileIcon } from "@/lib/file-icons";
 import { useDragDrop } from "@/lib/hooks/use-drag-drop";
 import { useFolderPath } from "@/lib/hooks/use-folder-path";
 import { useItemOperations, useItems } from "@/lib/hooks/use-item-operations";
 import { ArrowUpDown, Download, Eye, Home, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
-import React, { useState } from "react";
+import { use, useState } from "react";
 import toast from "react-hot-toast";
 
 interface FolderNavigationPageProps {
@@ -17,14 +18,8 @@ export default function FolderNavigationPage({
 }: FolderNavigationPageProps) {
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
 
-  // Resolve params
-  const [resolvedParams, setResolvedParams] = useState<{
-    path: string[];
-  } | null>(null);
-
-  React.useEffect(() => {
-    params.then(setResolvedParams);
-  }, [params]);
+  // Resolve params using React 18 use() hook
+  const resolvedParams = use(params);
 
   // Get the current folder path from URL
   const folderPath = resolvedParams?.path || [];
@@ -74,29 +69,6 @@ export default function FolderNavigationPage({
   const isAllSelected = selectedFiles.length === files.length;
   const isIndeterminate =
     selectedFiles.length > 0 && selectedFiles.length < files.length;
-
-  const getFileIcon = (type: string) => {
-    switch (type) {
-      case "folder":
-        return "📁";
-      case "DOCX":
-        return "📄";
-      case "PNG":
-        return "🖼️";
-      case "CODE":
-        return "💾";
-      case "XLS":
-        return "📊";
-      case "MP3":
-        return "🎵";
-      case "ZIP":
-        return "🗜️";
-      case "PAGE":
-        return "📄";
-      default:
-        return "📄";
-    }
-  };
 
   // Error state for invalid paths
   if (pathError) {
@@ -204,7 +176,9 @@ export default function FolderNavigationPage({
                   </td>
                   <td className="py-4">
                     <div className="flex items-center space-x-3">
-                      <div className="text-2xl">{getFileIcon(file.type)}</div>
+                      <div className="text-2xl">
+                        {getFileIcon(file.type, file.name)}
+                      </div>
                       {file.isFolder ? (
                         <Link
                           href={`/dashboard/${[...folderPath, encodeURIComponent(file.name)].join("/")}`}

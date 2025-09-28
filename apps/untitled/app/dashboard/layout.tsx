@@ -1,5 +1,6 @@
 "use client";
 
+import { getFileIcon } from "@/lib/file-icons";
 import { useFolderChildren } from "@/lib/hooks/use-folder-children";
 import {
   useItemOperations,
@@ -247,25 +248,6 @@ export default function DashboardLayout({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const getFileIcon = (type: string) => {
-    switch (type) {
-      case "folder":
-        return "📁";
-      case "PDF":
-        return "📄";
-      case "TXT":
-        return "📝";
-      case "DOCX":
-        return "📄";
-      case "ZIP":
-        return "🗜️";
-      case "PPTX":
-        return "📊";
-      default:
-        return "📄";
-    }
-  };
 
   // Handle ESC key to close modals
   useEffect(() => {
@@ -769,7 +751,9 @@ export default function DashboardLayout({
                       }}
                     >
                       <div className="flex items-center space-x-3">
-                        <div className="text-xl">{getFileIcon(item.type)}</div>
+                        <div className="text-xl">
+                          {getFileIcon(item.type, item.name)}
+                        </div>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-sm font-medium text-gray-900">
                             {item.name}

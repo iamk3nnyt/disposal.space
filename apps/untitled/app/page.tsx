@@ -1,3 +1,4 @@
+import { getFileIcon } from "@/lib/file-icons";
 import {
   Archive,
   ArrowRight,
@@ -61,23 +62,6 @@ export default function Home() {
       date: "Sep. 26 2025",
     },
   ];
-
-  const getFileIcon = (type: string) => {
-    switch (type) {
-      case "folder":
-        return "📁";
-      case "DOCX":
-        return "📄";
-      case "PNG":
-        return "🖼️";
-      case "CODE":
-        return "💾";
-      case "XLS":
-        return "📊";
-      default:
-        return "📄";
-    }
-  };
 
   return (
     <div className="flex min-h-screen items-center overflow-x-hidden bg-white">
@@ -326,7 +310,7 @@ export default function Home() {
                                 <td className="py-4">
                                   <div className="flex items-center space-x-3">
                                     <div className="text-2xl">
-                                      {getFileIcon(file.type)}
+                                      {getFileIcon(file.type, file.name)}
                                     </div>
                                     <span className="text-sm font-medium text-gray-900">
                                       {file.name}

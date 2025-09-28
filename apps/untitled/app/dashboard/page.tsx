@@ -1,5 +1,6 @@
 "use client";
 
+import { getFileIcon } from "@/lib/file-icons";
 import { useDragDrop } from "@/lib/hooks/use-drag-drop";
 import { useItemOperations, useItems } from "@/lib/hooks/use-item-operations";
 import { ArrowUpDown, Download, Eye, Trash2, Upload } from "lucide-react";
@@ -42,29 +43,6 @@ export default function Home() {
   const isAllSelected = selectedFiles.length === files.length;
   const isIndeterminate =
     selectedFiles.length > 0 && selectedFiles.length < files.length;
-
-  const getFileIcon = (type: string) => {
-    switch (type) {
-      case "folder":
-        return "📁";
-      case "DOCX":
-        return "📄";
-      case "PNG":
-        return "🖼️";
-      case "CODE":
-        return "💾";
-      case "XLS":
-        return "📊";
-      case "MP3":
-        return "🎵";
-      case "ZIP":
-        return "🗜️";
-      case "PAGE":
-        return "📄";
-      default:
-        return "📄";
-    }
-  };
 
   // Loading state
   if (isLoading) {
@@ -146,7 +124,9 @@ export default function Home() {
                   </td>
                   <td className="py-4">
                     <div className="flex items-center space-x-3">
-                      <div className="text-2xl">{getFileIcon(file.type)}</div>
+                      <div className="text-2xl">
+                        {getFileIcon(file.type, file.name)}
+                      </div>
                       {file.isFolder ? (
                         <Link
                           href={`/dashboard/${encodeURIComponent(file.name)}`}
