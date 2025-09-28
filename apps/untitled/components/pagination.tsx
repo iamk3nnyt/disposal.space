@@ -30,42 +30,51 @@ export function Pagination({
   // Generate page numbers to display
   const getPageNumbers = () => {
     const pages: (number | string)[] = [];
-    const maxVisiblePages = 5;
+    const maxVisiblePages = 5; // Number of page buttons to show
 
     if (totalPages <= maxVisiblePages) {
-      // Show all pages if total is small
+      // Show all pages if total is small (no ellipsis needed)
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
       }
     } else {
-      // Show pages with ellipsis
-      if (currentPage <= 3) {
-        // Near the beginning
-        pages.push(1, 2, 3, 4, "...", totalPages);
-      } else if (currentPage >= totalPages - 2) {
-        // Near the end
-        pages.push(
-          1,
-          "...",
-          totalPages - 3,
-          totalPages - 2,
-          totalPages - 1,
-          totalPages,
-        );
-      } else {
-        // In the middle
-        pages.push(
-          1,
-          "...",
-          currentPage - 1,
-          currentPage,
-          currentPage + 1,
-          "...",
-          totalPages,
-        );
-      }
-    }
+      // Always show first page
+      pages.push(1);
 
+      // Determine if we need left ellipsis
+      if (currentPage > Math.floor(maxVisiblePages / 2) + 1) {
+        pages.push("...");
+      }
+
+      // Show pages around current page
+      const start = Math.max(
+        2,
+        currentPage - Math.floor(maxVisiblePages / 2) + 1,
+      );
+      const end = Math.min(
+        totalPages - 1,
+        currentPage + Math.floor(maxVisiblePages / 2) - 1,
+      );
+
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+
+      // Determine if we need right ellipsis
+      if (currentPage < totalPages - Math.floor(maxVisiblePages / 2)) {
+        pages.push("...");
+      }
+
+      // Always show last page
+      if (totalPages > 1) {
+        pages.push(totalPages);
+      }
+
+      // Filter out consecutive ellipses
+      return pages.filter((page, index, arr) => {
+        return !(page === "..." && arr[index - 1] === "...");
+      });
+    }
     return pages;
   };
 
@@ -120,35 +129,28 @@ export function Pagination({
             </button>
 
             {/* Page numbers */}
-            {pageNumbers.map((page, index) => {
-              if (page === "...") {
-                return (
-                  <span
-                    key={`ellipsis-${index}`}
-                    className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset focus:outline-offset-0"
-                  >
-                    ...
-                  </span>
-                );
-              }
-
-              const pageNum = page as number;
-              const isCurrentPage = pageNum === currentPage;
-
-              return (
+            {pageNumbers.map((pageNum, index) =>
+              pageNum === "..." ? (
+                <span
+                  key={`ellipsis-${index}`}
+                  className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset focus:outline-offset-0"
+                >
+                  ...
+                </span>
+              ) : (
                 <button
                   key={pageNum}
-                  onClick={() => onPageChange(pageNum)}
-                  className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ring-1 ring-gray-300 ring-inset focus:z-20 focus:outline-offset-0 ${
-                    isCurrentPage
-                      ? "z-10 bg-green-600 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
-                      : "text-gray-900 hover:bg-gray-50"
+                  onClick={() => onPageChange(pageNum as number)}
+                  className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ring-gray-300 ring-inset focus:z-20 focus:outline-offset-0 ${
+                    pageNum === currentPage
+                      ? "z-10 bg-green-600 text-white ring-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
+                      : "text-gray-900 ring-1 hover:bg-gray-50"
                   }`}
                 >
                   {pageNum}
                 </button>
-              );
-            })}
+              ),
+            )}
 
             {/* Next button */}
             <button
