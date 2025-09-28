@@ -536,7 +536,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                       // Error state
                       <div className="flex items-center justify-center py-8">
                         <div className="flex flex-col items-center space-y-2 text-center">
-                          <div className="text-red-400">⚠️</div>
+                          <AlertTriangle className="h-5 w-5 text-red-400" />
                           <span className="text-xs text-red-600">
                             Failed to load folder
                           </span>

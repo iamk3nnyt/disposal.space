@@ -12,6 +12,7 @@ import {
   Download,
   Eye,
   Folder,
+  FolderX,
   Home,
   Trash2,
   Upload,
@@ -93,11 +94,9 @@ export default function FolderNavigationPage({
   // Error state for invalid paths
   if (pathError) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-            <Home className="h-6 w-6 text-red-600" />
-          </div>
+          <FolderX className="mx-auto mb-4 h-12 w-12 text-gray-400" />
           <h3 className="mb-2 text-lg font-medium text-gray-900">
             Folder Not Found
           </h3>
