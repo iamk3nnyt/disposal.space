@@ -31,8 +31,8 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
 type SidebarItem = {
@@ -44,15 +44,16 @@ type SidebarItem = {
   children?: { id: string; name: string; type: string }[];
 };
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useUser();
   const { data: storageData } = useUserStorage();
+
+  // Pagination state
+  const currentPage = parseInt(searchParams.get("page") || "1", 10);
+  const itemsPerPage = 10;
 
   // Get current folder path segments for dynamic content
   const getCurrentFolderPath = () => {
@@ -187,9 +188,17 @@ export default function DashboardLayout({
   // Determine if there's an error
   const sidebarError = folderPathError || itemsError;
 
+  // Apply pagination to sidebar items
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedSidebarItems = useMemo(() => {
+    const allSidebarItems = itemsData?.items || [];
+    return allSidebarItems.slice(startIndex, endIndex);
+  }, [itemsData?.items, startIndex, endIndex]);
+
   // Convert current folder's items to sidebar format with children support
   const sidebarItems: SidebarItem[] =
-    itemsData?.items.map((item) => ({
+    paginatedSidebarItems.map((item) => ({
       id: item.id,
       name: item.name,
       type: item.type,
@@ -1095,5 +1104,23 @@ export default function DashboardLayout({
         </div>
       )}
     </div>
+  );
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center">
+          Loading...
+        </div>
+      }
+    >
+      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+    </Suspense>
   );
 }

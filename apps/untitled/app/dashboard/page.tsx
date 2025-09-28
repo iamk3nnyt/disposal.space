@@ -1,8 +1,10 @@
 "use client";
 
+import { Pagination } from "@/components/pagination";
 import { getFileIcon } from "@/lib/file-icons";
 import { useDragDrop } from "@/lib/hooks/use-drag-drop";
 import { useItemOperations, useItems } from "@/lib/hooks/use-item-operations";
+import { usePagination } from "@/lib/hooks/use-pagination";
 import { ArrowUpDown, Download, Eye, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -22,7 +24,15 @@ export default function Home() {
 
   // Fetch items from API
   const { data: itemsData, isLoading, error } = useItems();
-  const files = itemsData?.items || [];
+  const allFiles = itemsData?.items || [];
+
+  // Pagination
+  const pagination = usePagination({
+    itemsPerPage: 10,
+    totalItems: allFiles.length,
+  });
+
+  const files = pagination.getPageItems(allFiles);
 
   const toggleFileSelection = (fileId: string) => {
     setSelectedFiles((prev) =>
@@ -40,7 +50,8 @@ export default function Home() {
     }
   };
 
-  const isAllSelected = selectedFiles.length === files.length;
+  const isAllSelected =
+    selectedFiles.length === files.length && files.length > 0;
   const isIndeterminate =
     selectedFiles.length > 0 && selectedFiles.length < files.length;
 
@@ -224,6 +235,20 @@ export default function Home() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          hasNextPage={pagination.hasNextPage}
+          hasPreviousPage={pagination.hasPreviousPage}
+          onPageChange={pagination.goToPage}
+          onNextPage={pagination.goToNextPage}
+          onPreviousPage={pagination.goToPreviousPage}
+          totalItems={allFiles.length}
+          startIndex={pagination.startIndex}
+          endIndex={pagination.endIndex}
+        />
 
         {/* Upload Progress */}
         {uploadingFiles.length > 0 && (
