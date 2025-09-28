@@ -7,7 +7,7 @@ import {
   useItems,
   type UploadProgress,
 } from "@/lib/hooks/use-item-operations";
-import { useSearch } from "@/lib/hooks/use-search";
+import { useSearch, type SearchResult } from "@/lib/hooks/use-search";
 import { useUserStorage } from "@/lib/hooks/use-user-storage";
 import { cn } from "@/lib/utils";
 import {
@@ -28,7 +28,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -47,6 +47,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: storageData } = useUserStorage();
   const { data: itemsData } = useItems();
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -248,6 +249,39 @@ export default function DashboardLayout({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Handle navigation from search results
+  const handleSearchItemClick = (item: SearchResult) => {
+    setIsSearchModalOpen(false);
+    setSearchQuery("");
+
+    if (item.type === "folder") {
+      // Navigate to the folder itself
+      if (item.pathSegments && item.pathSegments.length > 0) {
+        // Navigate to the folder using its path segments + its own name
+        const fullPath = [...item.pathSegments, item.name];
+        const encodedPath = fullPath
+          .map((segment) => encodeURIComponent(segment))
+          .join("/");
+        router.push(`/dashboard/${encodedPath}`);
+      } else {
+        // Root level folder
+        router.push(`/dashboard/${encodeURIComponent(item.name)}`);
+      }
+    } else {
+      // Navigate to the parent folder where the file resides
+      if (item.pathSegments && item.pathSegments.length > 0) {
+        // Navigate to the parent folder
+        const encodedPath = item.pathSegments
+          .map((segment) => encodeURIComponent(segment))
+          .join("/");
+        router.push(`/dashboard/${encodedPath}`);
+      } else {
+        // File is in root, navigate to dashboard root
+        router.push("/dashboard");
+      }
+    }
+  };
 
   // Handle ESC key to close modals
   useEffect(() => {
@@ -743,12 +777,7 @@ export default function DashboardLayout({
                     <div
                       key={item.id}
                       className="group flex cursor-pointer items-center justify-between px-6 py-3 hover:bg-gray-50"
-                      onClick={() => {
-                        // Handle item selection
-                        console.log("Selected item:", item);
-                        setIsSearchModalOpen(false);
-                        setSearchQuery("");
-                      }}
+                      onClick={() => handleSearchItemClick(item)}
                     >
                       <div className="flex items-center space-x-3">
                         <div className="text-xl">

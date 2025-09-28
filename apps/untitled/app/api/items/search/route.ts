@@ -78,10 +78,12 @@ export async function GET(request: NextRequest) {
     // Format results and add path information
     const formattedResults = await Promise.all(
       searchResults.map(async (item) => {
-        const path = await getItemPath(item.parentId || "", user.id);
+        const pathSegments = await getItemPath(item.parentId || "", user.id);
         return {
           ...formatItemForFrontend(item),
-          path: path.length > 0 ? path.join(" > ") : "Root",
+          path: pathSegments.length > 0 ? pathSegments.join(" > ") : "Root",
+          pathSegments: pathSegments, // Include raw path segments for navigation
+          parentId: item.parentId, // Include parent ID for navigation
         };
       }),
     );

@@ -12,6 +12,8 @@ export interface SearchResult {
   isFolder: boolean;
   sizeBytes: number;
   path: string; // Breadcrumb path
+  pathSegments: string[]; // Raw path segments for navigation
+  parentId: string | null; // Parent folder ID for navigation
 }
 
 export interface SearchResponse {
