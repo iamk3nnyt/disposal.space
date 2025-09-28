@@ -8,6 +8,7 @@ import {
   useItems,
   type UploadProgress,
 } from "@/lib/hooks/use-item-operations";
+import { usePagination } from "@/lib/hooks/use-pagination";
 import { useSearch, type SearchResult } from "@/lib/hooks/use-search";
 import { useUserStorage } from "@/lib/hooks/use-user-storage";
 import { cn } from "@/lib/utils";
@@ -31,7 +32,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -47,13 +48,8 @@ type SidebarItem = {
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { user } = useUser();
   const { data: storageData } = useUserStorage();
-
-  // Pagination state
-  const currentPage = parseInt(searchParams.get("page") || "1", 10);
-  const itemsPerPage = 10;
 
   // Get current folder path segments for dynamic content
   const getCurrentFolderPath = () => {
@@ -86,6 +82,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     isLoading: isItemsLoading,
     error: itemsError,
   } = useItems(currentFolderPath.length === 0 ? null : folderData?.folderId);
+
+  // Sidebar pagination with proper validation (same as main content)
+  const sidebarPagination = usePagination({
+    itemsPerPage: 10,
+    totalItems: itemsData?.items?.length || 0,
+  });
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const {
@@ -188,13 +190,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   // Determine if there's an error
   const sidebarError = folderPathError || itemsError;
 
-  // Apply pagination to sidebar items
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
+  // Apply pagination to sidebar items using validated pagination
   const paginatedSidebarItems = useMemo(() => {
     const allSidebarItems = itemsData?.items || [];
-    return allSidebarItems.slice(startIndex, endIndex);
-  }, [itemsData?.items, startIndex, endIndex]);
+    return sidebarPagination.getPageItems(allSidebarItems);
+  }, [itemsData?.items, sidebarPagination]);
 
   // Convert current folder's items to sidebar format with children support
   const sidebarItems: SidebarItem[] =
