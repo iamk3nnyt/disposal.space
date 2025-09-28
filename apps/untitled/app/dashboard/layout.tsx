@@ -648,12 +648,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                                     }
                                     className="flex flex-1 cursor-pointer items-center space-x-2"
                                   >
-                                    <Folder className="h-3 w-3" />
+                                    <Folder className="h-3 w-3 shrink-0" />
                                     <span>{child.name}</span>
                                   </Link>
                                 ) : (
                                   <div className="flex flex-1 cursor-pointer items-center space-x-2">
-                                    <File className="h-3 w-3" />
+                                    <File className="h-3 w-3 shrink-0" />
                                     <span>{child.name}</span>
                                   </div>
                                 )}
@@ -668,7 +668,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               </div>
 
               {/* Usage Details */}
-              <div className="mt-auto border-t border-gray-200 p-4">
+              <div className="sticky bottom-0 min-h-22 border-t border-gray-200 p-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <span>Storage Used</span>
