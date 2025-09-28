@@ -1,3 +1,4 @@
+import { createFolderHierarchy } from "@/lib/folder-traversal";
 import { formatFileSize, formatItemForFrontend } from "@/lib/utils";
 import { auth } from "@clerk/nextjs/server";
 import {
@@ -171,11 +172,8 @@ async function handleFileUploadWithSSE(
         const uploadResults = [];
         let totalSize = 0;
 
-        // Create a map to store created folders to avoid duplicates
-        const createdFolders = new Map<string, string>();
-
-        // Helper function to create folder hierarchy
-        const createFolderHierarchy = async (
+        // Helper function to create folder hierarchy using unified resolver
+        const createFolderHierarchyFromPath = async (
           relativePath: string,
           userId: string,
           rootParentId: string | null,
@@ -194,59 +192,13 @@ async function handleFileUploadWithSSE(
             return rootParentId;
           }
 
-          let currentParentId = rootParentId;
-          let currentPath = "";
-
-          for (const folderName of folderParts) {
-            currentPath = currentPath
-              ? `${currentPath}/${folderName}`
-              : folderName;
-
-            // Check if we already created this folder
-            if (createdFolders.has(currentPath)) {
-              currentParentId = createdFolders.get(currentPath)!;
-              continue;
-            }
-
-            // Check if folder already exists in database
-            const [existingFolder] = await db
-              .select()
-              .from(items)
-              .where(
-                and(
-                  eq(items.userId, userId),
-                  currentParentId
-                    ? eq(items.parentId, currentParentId)
-                    : isNull(items.parentId),
-                  eq(items.name, folderName),
-                  eq(items.type, "folder"),
-                  eq(items.isDeleted, false),
-                ),
-              )
-              .limit(1);
-
-            if (existingFolder) {
-              currentParentId = existingFolder.id;
-              createdFolders.set(currentPath, existingFolder.id);
-            } else {
-              // Create new folder
-              const [newFolder] = await db
-                .insert(items)
-                .values({
-                  userId,
-                  parentId: currentParentId,
-                  name: folderName,
-                  type: "folder",
-                  sizeBytes: 0,
-                })
-                .returning();
-
-              currentParentId = newFolder.id;
-              createdFolders.set(currentPath, newFolder.id);
-            }
-          }
-
-          return currentParentId;
+          // Use unified folder hierarchy creator
+          const result = await createFolderHierarchy(
+            folderParts,
+            userId,
+            rootParentId,
+          );
+          return result.folderId;
         };
 
         // Send initial progress
@@ -304,7 +256,7 @@ async function handleFileUploadWithSSE(
               file.name;
 
             // Create folder hierarchy if needed
-            const fileParentId = await createFolderHierarchy(
+            const fileParentId = await createFolderHierarchyFromPath(
               relativePath,
               user.id,
               parentId,
@@ -487,11 +439,8 @@ async function handleFileUpload(
   const uploadResults = [];
   let totalSize = 0;
 
-  // Create a map to store created folders to avoid duplicates
-  const createdFolders = new Map<string, string>();
-
-  // Helper function to create folder hierarchy
-  const createFolderHierarchy = async (
+  // Helper function to create folder hierarchy using unified resolver
+  const createFolderHierarchyFromPath = async (
     relativePath: string,
     userId: string,
     rootParentId: string | null,
@@ -505,57 +454,13 @@ async function handleFileUpload(
     const folderParts = pathParts.slice(0, -1);
     if (folderParts.length === 0) return rootParentId;
 
-    let currentParentId = rootParentId;
-    let currentPath = "";
-
-    for (const folderName of folderParts) {
-      currentPath = currentPath ? `${currentPath}/${folderName}` : folderName;
-
-      // Check if we already created this folder
-      if (createdFolders.has(currentPath)) {
-        currentParentId = createdFolders.get(currentPath)!;
-        continue;
-      }
-
-      // Check if folder already exists in database
-      const [existingFolder] = await db
-        .select()
-        .from(items)
-        .where(
-          and(
-            eq(items.userId, userId),
-            currentParentId
-              ? eq(items.parentId, currentParentId)
-              : isNull(items.parentId),
-            eq(items.name, folderName),
-            eq(items.type, "folder"),
-            eq(items.isDeleted, false),
-          ),
-        )
-        .limit(1);
-
-      if (existingFolder) {
-        currentParentId = existingFolder.id;
-        createdFolders.set(currentPath, existingFolder.id);
-      } else {
-        // Create new folder
-        const [newFolder] = await db
-          .insert(items)
-          .values({
-            userId,
-            parentId: currentParentId,
-            name: folderName,
-            type: "folder",
-            sizeBytes: 0,
-          })
-          .returning();
-
-        currentParentId = newFolder.id;
-        createdFolders.set(currentPath, newFolder.id);
-      }
-    }
-
-    return currentParentId;
+    // Use unified folder hierarchy creator
+    const result = await createFolderHierarchy(
+      folderParts,
+      userId,
+      rootParentId,
+    );
+    return result.folderId;
   };
 
   // Calculate total size of all files to check if batch would exceed limit
@@ -584,7 +489,7 @@ async function handleFileUpload(
         file.name;
 
       // Create folder hierarchy if needed
-      const fileParentId = await createFolderHierarchy(
+      const fileParentId = await createFolderHierarchyFromPath(
         relativePath,
         user.id,
         parentId,
