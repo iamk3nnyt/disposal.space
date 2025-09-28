@@ -79,12 +79,12 @@ export default function Home() {
     <>
       {/* File List */}
       <div
-        className="relative flex-1 overflow-auto py-3 pr-6 pl-3"
+        className="relative flex-1 overflow-auto"
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <div className="overflow-x-auto py-3">
+        <div className="my-6 mr-6 ml-3 overflow-x-auto">
           <table className="w-full min-w-[800px]">
             <thead>
               <tr className="border-b border-gray-100 text-left text-sm text-gray-500">
@@ -261,7 +261,7 @@ export default function Home() {
 
         {/* Drag Overlay */}
         {isDragOver && (
-          <div className="bg-opacity-90 absolute inset-0 flex items-center justify-center rounded-lg border-2 border-dashed border-green-300 bg-green-50">
+          <div className="bg-opacity-90 sticky inset-0 flex h-full w-full items-center justify-center rounded-lg border-2 border-dashed border-green-300 bg-green-50">
             <div className="text-center">
               <Upload className="mx-auto mb-4 h-12 w-12 text-green-500" />
               <h3 className="mb-2 text-lg font-medium text-green-700">
