@@ -336,9 +336,18 @@ async function uploadFilesWithProgress(
 
   const formData = new FormData();
 
-  // Add files to form data
-  files.forEach((file) => {
+  // Add files to form data with path information
+  files.forEach((file, index) => {
     formData.append("files", file);
+
+    // Add the webkitRelativePath separately if it exists
+    const relativePath = (file as File & { webkitRelativePath?: string })
+      .webkitRelativePath;
+    if (relativePath) {
+      formData.append(`filePaths`, relativePath);
+    } else {
+      formData.append(`filePaths`, file.name);
+    }
   });
 
   if (parentId) {
@@ -616,7 +625,7 @@ export function useItemOperations() {
     },
 
     // Preview item (get URL and open in new tab)
-    preview: async (itemId: string, fileName: string) => {
+    preview: async (itemId: string) => {
       try {
         const previewData = await getItemPreviewUrl(itemId);
         // Open the presigned URL in a new tab for preview

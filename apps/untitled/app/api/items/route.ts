@@ -155,6 +155,7 @@ async function handleFileUploadWithSSE(
         // Parse form data
         const formData = await request.formData();
         const files = formData.getAll("files") as File[];
+        const filePaths = formData.getAll("filePaths") as string[];
         const parentId = formData.get("parentId") as string | null;
 
         if (!files || files.length === 0) {
@@ -188,7 +189,10 @@ async function handleFileUploadWithSSE(
 
           // Remove the filename (last part) to get folder path
           const folderParts = pathParts.slice(0, -1);
-          if (folderParts.length === 0) return rootParentId;
+
+          if (folderParts.length === 0) {
+            return rootParentId;
+          }
 
           let currentParentId = rootParentId;
           let currentPath = "";
@@ -292,10 +296,12 @@ async function handleFileUploadWithSSE(
               },
             });
 
-            // Get the relative path from webkitdirectory uploads
+            // Get the relative path from the separate filePaths array or fallback to webkitRelativePath
             const relativePath =
+              filePaths[i] ||
               (file as File & { webkitRelativePath?: string })
-                .webkitRelativePath || file.name;
+                .webkitRelativePath ||
+              file.name;
 
             // Create folder hierarchy if needed
             const fileParentId = await createFolderHierarchy(
@@ -471,6 +477,7 @@ async function handleFileUpload(
   // Parse form data
   const formData = await request.formData();
   const files = formData.getAll("files") as File[];
+  const filePaths = formData.getAll("filePaths") as string[];
   const parentId = formData.get("parentId") as string | null;
 
   if (!files || files.length === 0) {
@@ -570,8 +577,9 @@ async function handleFileUpload(
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     try {
-      // Get the relative path from webkitdirectory uploads
+      // Get the relative path from the separate filePaths array or fallback to webkitRelativePath
       const relativePath =
+        filePaths[i] ||
         (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
         file.name;
 

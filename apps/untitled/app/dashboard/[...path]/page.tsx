@@ -1,11 +1,8 @@
 "use client";
 
+import { useDragDrop } from "@/lib/hooks/use-drag-drop";
 import { useFolderPath } from "@/lib/hooks/use-folder-path";
-import {
-  useItemOperations,
-  useItems,
-  type UploadProgress,
-} from "@/lib/hooks/use-item-operations";
+import { useItemOperations, useItems } from "@/lib/hooks/use-item-operations";
 import { ArrowUpDown, Download, Eye, Home, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import React, { useState } from "react";
@@ -19,8 +16,6 @@ export default function FolderNavigationPage({
   params,
 }: FolderNavigationPageProps) {
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [uploadingFiles, setUploadingFiles] = useState<UploadProgress[]>([]);
 
   // Resolve params
   const [resolvedParams, setResolvedParams] = useState<{
@@ -47,6 +42,15 @@ export default function FolderNavigationPage({
   );
   const itemOperations = useItemOperations();
 
+  // Drag and drop functionality
+  const {
+    isDragOver,
+    uploadingFiles,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+  } = useDragDrop(folderData?.folderId || undefined);
+
   const isLoading = isLoadingPath || isLoadingItems;
 
   const toggleFileSelection = (fileId: string) => {
@@ -70,55 +74,6 @@ export default function FolderNavigationPage({
   const isAllSelected = selectedFiles.length === files.length;
   const isIndeterminate =
     selectedFiles.length > 0 && selectedFiles.length < files.length;
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-
-    const droppedFiles = Array.from(e.dataTransfer.files);
-    if (droppedFiles.length === 0) return;
-
-    // Start upload with progress tracking
-    try {
-      await itemOperations.uploadFiles(
-        droppedFiles,
-        folderData?.folderId || undefined,
-        (progress) => {
-          setUploadingFiles(progress);
-        },
-      );
-
-      // Show success message
-      setTimeout(() => {
-        toast.success(`Files disposed successfully!`);
-      }, 500);
-
-      // Clear upload progress after showing completion briefly
-      setTimeout(() => {
-        setUploadingFiles([]);
-      }, 2000);
-    } catch (error) {
-      console.error("Upload failed:", error);
-
-      // Show error message
-      const errorMessage =
-        error instanceof Error ? error.message : "Upload failed";
-      toast.error(errorMessage);
-
-      // Clear upload progress
-      setUploadingFiles([]);
-    }
-  };
 
   const getFileIcon = (type: string) => {
     switch (type) {
@@ -237,8 +192,8 @@ export default function FolderNavigationPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {files.map((file) => (
-                <tr key={file.id} className="group hover:bg-gray-50">
+              {files.map((file, index) => (
+                <tr key={index} className="group hover:bg-gray-50">
                   <td className="py-4 pl-3">
                     <input
                       type="checkbox"
@@ -286,7 +241,6 @@ export default function FolderNavigationPage({
                           onClick={() => {
                             const previewPromise = itemOperations.preview(
                               file.id,
-                              file.name,
                             );
                             toast.promise(previewPromise, {
                               loading: `Opening preview for "${file.name}"...`,
@@ -352,9 +306,9 @@ export default function FolderNavigationPage({
         {/* Upload Progress */}
         {uploadingFiles.length > 0 && (
           <div className="absolute right-4 bottom-4 w-80 space-y-2">
-            {uploadingFiles.map((file) => (
+            {uploadingFiles.map((file, index) => (
               <div
-                key={file.fileName}
+                key={index}
                 className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
               >
                 <div className="flex items-center justify-between">
@@ -398,10 +352,10 @@ export default function FolderNavigationPage({
             <div className="text-center">
               <Upload className="mx-auto mb-4 h-12 w-12 text-green-500" />
               <p className="text-lg font-medium text-green-700">
-                Drop files here to dispose
+                Drop files or folders here to dispose
               </p>
               <p className="text-sm text-green-600">
-                Files will be uploaded to this folder
+                Files and folders will be uploaded to this folder
               </p>
             </div>
           </div>
