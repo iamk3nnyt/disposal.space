@@ -1,10 +1,28 @@
 "use client";
 
+import { useUserStorage } from "@/lib/hooks/use-user-storage";
 import { cn } from "@/lib/utils";
-import { Download, Folder, Trash2 } from "lucide-react";
+import { BarChart3, CreditCard, Folder, Trash2 } from "lucide-react";
+
+interface SettingItem {
+  id: string;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  type: "info" | "button" | "danger-button";
+  value?: string;
+  action?: string;
+  href?: string;
+}
+
+interface SettingSection {
+  title: string;
+  settings: SettingItem[];
+}
 
 export default function SettingsPage() {
-  const settingSections = [
+  const { data: storageData, isLoading: isLoadingStorage } = useUserStorage();
+  const settingSections: SettingSection[] = [
     {
       title: "Storage",
       settings: [
@@ -12,17 +30,42 @@ export default function SettingsPage() {
           id: "storage-usage",
           icon: <Folder className="h-5 w-5" />,
           title: "Storage Usage",
-          description: "2.4 GB of 15 GB used",
+          description: isLoadingStorage
+            ? "Loading storage information..."
+            : `${storageData?.user.storageUsedFormatted || "0 Bytes"} of ${storageData?.user.storageLimitFormatted || "15 GB"} used`,
           type: "info",
-          value: "16% used",
+          value: isLoadingStorage
+            ? "Loading..."
+            : `${storageData?.user.storageUsedPercentage || 0}% used`,
         },
         {
-          id: "export-data",
-          icon: <Download className="h-5 w-5" />,
-          title: "Export Data",
-          description: "Download all your disposed items",
+          id: "storage-details",
+          icon: <BarChart3 className="h-5 w-5" />,
+          title: "Storage Details",
+          description: isLoadingStorage
+            ? "Loading item statistics..."
+            : `${storageData?.stats.totalItems || 0} total items (${storageData?.stats.fileCount || 0} files, ${storageData?.stats.folderCount || 0} folders)`,
+          type: "info",
+          value: isLoadingStorage
+            ? "..."
+            : `${storageData?.user.storageAvailableFormatted || "15 GB"} available`,
+        },
+      ],
+    },
+    {
+      title: "Billing & Subscription",
+      settings: [
+        {
+          id: "billing",
+          icon: <CreditCard className="h-5 w-5" />,
+          title: "Manage Billing",
+          description:
+            "View invoices, update payment methods, and manage your subscription",
           type: "button",
-          action: "Export",
+          action: "Open Billing Portal",
+          href:
+            process.env.NEXT_PUBLIC_STRIPE_BILLING_URL ||
+            "https://billing.stripe.com/p/login/test_00000000000000",
         },
       ],
     },
@@ -106,11 +149,21 @@ export default function SettingsPage() {
                               {setting.value}
                             </span>
                           )}
-                          {setting.type === "button" && (
-                            <button className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
-                              {setting.action}
-                            </button>
-                          )}
+                          {setting.type === "button" &&
+                            ((setting as SettingItem).href ? (
+                              <a
+                                href={(setting as SettingItem).href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                              >
+                                {setting.action}
+                              </a>
+                            ) : (
+                              <button className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                                {setting.action}
+                              </button>
+                            ))}
                           {setting.type === "danger-button" && (
                             <button className="rounded-md bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700">
                               {setting.action}
