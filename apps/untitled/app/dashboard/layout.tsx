@@ -10,6 +10,7 @@ import {
 import { useSearch, type SearchResult } from "@/lib/hooks/use-search";
 import { useUserStorage } from "@/lib/hooks/use-user-storage";
 import { cn } from "@/lib/utils";
+import { useUser } from "@clerk/nextjs";
 import {
   ArrowLeft,
   ChevronDown,
@@ -48,6 +49,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { user } = useUser();
   const { data: storageData } = useUserStorage();
   const { data: itemsData } = useItems();
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -77,6 +79,49 @@ export default function DashboardLayout({
   // Use TanStack Query to fetch children for expanded folders
   const expandedFolderIds = Array.from(expandedFolders);
   const { folderChildren } = useFolderChildren(expandedFolderIds);
+
+  // Get user's display name with email fallback
+  const getUserDisplayName = () => {
+    if (!user) return "Loading...";
+
+    // Try to get full name from Clerk user data
+    const firstName = user.firstName;
+    const lastName = user.lastName;
+
+    if (firstName && lastName) {
+      return `${firstName} ${lastName}`;
+    } else if (firstName) {
+      return firstName;
+    } else if (lastName) {
+      return lastName;
+    }
+
+    // Fallback to email
+    const email = user.emailAddresses?.[0]?.emailAddress;
+    return email || "User";
+  };
+
+  // Get user's email for subtitle
+  const getUserEmail = () => {
+    return user?.emailAddresses?.[0]?.emailAddress || "";
+  };
+
+  // Get user's initials for avatar
+  const getUserInitials = () => {
+    const displayName = getUserDisplayName();
+    if (displayName === "Loading..." || displayName === "User") {
+      return "DS";
+    }
+
+    const names = displayName.split(" ");
+    if (names.length >= 2) {
+      return `${names[0][0]}${names[1][0]}`.toUpperCase();
+    } else if (names.length === 1 && names[0].length > 0) {
+      return names[0][0].toUpperCase();
+    }
+
+    return "DS";
+  };
 
   // Convert API data to sidebar format with children support
   const sidebarItems: SidebarItem[] =
@@ -312,11 +357,17 @@ export default function DashboardLayout({
               <div className="flex h-16 items-center border-b border-gray-200 px-4">
                 <div className="flex items-center space-x-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500">
-                    <span className="text-sm font-medium text-white">DS</span>
+                    <span className="text-sm font-medium text-white">
+                      {getUserInitials()}
+                    </span>
                   </div>
-                  <div>
-                    <div className="text-sm font-medium">Disposal Space</div>
-                    <div className="text-xs text-gray-500">Hidden Archive</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">
+                      {getUserDisplayName()}
+                    </div>
+                    <div className="truncate text-xs text-gray-500">
+                      {getUserEmail()}
+                    </div>
                   </div>
                 </div>
               </div>
