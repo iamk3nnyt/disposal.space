@@ -135,15 +135,13 @@ export default function Home() {
                       <div className="flex items-center space-x-3">
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500">
                           <span className="text-sm font-medium text-white">
-                            DS
+                            JD
                           </span>
                         </div>
                         <div>
-                          <div className="text-sm font-medium">
-                            Disposal Space
-                          </div>
+                          <div className="text-sm font-medium">John Doe</div>
                           <div className="text-xs text-gray-500">
-                            Hidden Archive
+                            john.doe@example.com
                           </div>
                         </div>
                       </div>
@@ -257,7 +255,7 @@ export default function Home() {
                     <div className="flex h-16 w-full items-center justify-between border-b border-gray-200 px-6">
                       <div className="flex items-center">
                         <h2 className="text-base font-medium text-gray-900">
-                          Maybe Later
+                          Dashboard
                         </h2>
                       </div>
                       <div className="flex items-center space-x-3">

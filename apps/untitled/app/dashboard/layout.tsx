@@ -645,9 +645,8 @@ export default function DashboardLayout({
                           })}
                       </nav>
                     ) : (
-                      // Show "Maybe Later" for dashboard root
                       <h2 className="text-base font-medium text-gray-900">
-                        Maybe Later
+                        Dashboard
                       </h2>
                     )}
                   </div>
