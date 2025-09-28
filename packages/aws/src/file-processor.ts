@@ -148,10 +148,13 @@ export class FileProcessor {
     return await generateDownloadUrl(key, expiresIn);
   }
 
-  // Batch delete files
-  async deleteFiles(keys: string[]): Promise<void> {
-    const deletePromises = keys.map((key) => this.deleteFile(key));
-    await Promise.all(deletePromises);
+  // Batch delete files (optimized for large batches)
+  async deleteFiles(keys: string[]): Promise<{
+    deleted: string[];
+    errors: Array<{ key: string; error: string }>;
+  }> {
+    const { deleteFiles } = await import("./s3");
+    return await deleteFiles(keys);
   }
 
   // Get user files (by prefix)

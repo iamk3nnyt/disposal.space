@@ -13,6 +13,7 @@ export * from "./utils";
 // Export specific functions for convenience
 export {
   deleteFile,
+  deleteFiles,
   downloadFile,
   downloadFileRange,
   downloadFileStream,

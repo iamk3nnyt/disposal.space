@@ -2,7 +2,7 @@ import { formatItemForFrontend } from "@/lib/utils";
 import { auth } from "@clerk/nextjs/server";
 import { fileProcessor } from "@ketryon/aws";
 import { db, items, users } from "@ketryon/database";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 // Helper function to get all descendant items (for folder deletion)
@@ -278,28 +278,45 @@ export async function DELETE(
     if (existingItem.type === "folder") {
       // Get all descendants and calculate total size
       const descendants = await getAllDescendants(id, user.id);
-      totalSizeFreed = descendants
-        .filter((item) => item.type === "file")
-        .reduce((sum, item) => sum + item.sizeBytes, 0);
+      const fileDescendants = descendants.filter(
+        (item) => item.type === "file",
+      );
 
-      // Delete all descendant files from S3 first
-      for (const descendant of descendants) {
-        if (descendant.type === "file" && descendant.filePath) {
-          try {
-            await fileProcessor.deleteFile(descendant.filePath);
-          } catch (error) {
+      totalSizeFreed = fileDescendants.reduce(
+        (sum, item) => sum + item.sizeBytes,
+        0,
+      );
+
+      // Batch delete all descendant files from S3 (OPTIMIZED)
+      const filePaths = fileDescendants
+        .map((item) => item.filePath)
+        .filter(Boolean) as string[];
+
+      if (filePaths.length > 0) {
+        try {
+          const s3Result = await fileProcessor.deleteFiles(filePaths);
+
+          // Log any S3 deletion errors but continue with DB cleanup
+          if (s3Result.errors.length > 0) {
             console.error(
-              `Failed to delete file from S3: ${descendant.filePath}`,
-              error,
+              `Failed to delete ${s3Result.errors.length} files from S3:`,
+              s3Result.errors,
             );
-            // Continue with database deletion even if S3 deletion fails
           }
+
+          console.log(
+            `Successfully deleted ${s3Result.deleted.length} files from S3`,
+          );
+        } catch (error) {
+          console.error("Batch S3 deletion failed:", error);
+          // Continue with database deletion even if S3 deletion fails
         }
       }
 
-      // Delete all descendants from database
-      for (const descendant of descendants) {
-        await db.delete(items).where(eq(items.id, descendant.id));
+      // Bulk delete all descendants from database (OPTIMIZED)
+      if (descendants.length > 0) {
+        const descendantIds = descendants.map((d) => d.id);
+        await db.delete(items).where(inArray(items.id, descendantIds));
       }
     } else if (existingItem.type === "file") {
       // Delete single file from S3 first

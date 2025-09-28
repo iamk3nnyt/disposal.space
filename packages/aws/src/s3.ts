@@ -2,6 +2,7 @@ import {
   CompleteMultipartUploadCommand,
   CreateMultipartUploadCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
@@ -163,6 +164,67 @@ export async function deleteFile(key: string): Promise<void> {
   } catch (error) {
     throw new Error(`Failed to delete file: ${error}`);
   }
+}
+
+// Batch delete files from S3 (up to 1000 files per call)
+export async function deleteFiles(keys: string[]): Promise<{
+  deleted: string[];
+  errors: Array<{ key: string; error: string }>;
+}> {
+  if (keys.length === 0) {
+    return { deleted: [], errors: [] };
+  }
+
+  const results = {
+    deleted: [] as string[],
+    errors: [] as Array<{ key: string; error: string }>,
+  };
+
+  // AWS S3 supports up to 1000 objects per batch delete
+  const batchSize = 1000;
+
+  for (let i = 0; i < keys.length; i += batchSize) {
+    const batch = keys.slice(i, i + batchSize);
+
+    try {
+      const command = new DeleteObjectsCommand({
+        Bucket: awsConfig.bucketName,
+        Delete: {
+          Objects: batch.map((key) => ({ Key: key })),
+          Quiet: false, // Return info about deleted objects
+        },
+      });
+
+      const response = await s3Client.send(command);
+
+      // Track successful deletions
+      if (response.Deleted) {
+        results.deleted.push(
+          ...response.Deleted.map((obj) => obj.Key!).filter(Boolean)
+        );
+      }
+
+      // Track errors
+      if (response.Errors) {
+        results.errors.push(
+          ...response.Errors.map((err) => ({
+            key: err.Key!,
+            error: `${err.Code}: ${err.Message}`,
+          }))
+        );
+      }
+    } catch (error) {
+      // If entire batch fails, mark all keys as errors
+      results.errors.push(
+        ...batch.map((key) => ({
+          key,
+          error: `Batch deletion failed: ${error}`,
+        }))
+      );
+    }
+  }
+
+  return results;
 }
 
 // Get file metadata
