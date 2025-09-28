@@ -418,7 +418,7 @@ export default function DashboardLayout({
             {/* Sidebar */}
             <div className="flex h-full w-64 shrink-0 flex-col border-r border-gray-200 bg-gray-50">
               {/* Sidebar Header */}
-              <div className="flex h-16 items-center border-b border-gray-200 px-4">
+              <div className="flex h-16 min-h-16 items-center border-b border-gray-200 px-4">
                 <div className="flex items-center space-x-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500">
                     <span className="text-sm font-medium text-white">
@@ -506,11 +506,11 @@ export default function DashboardLayout({
               </div>
 
               {/* File Tree */}
-              <div className="px-4 py-2">
+              <div className="flex-1 overflow-hidden px-4 py-2">
                 <div className="mb-3 text-xs font-medium tracking-wider text-gray-400 uppercase">
                   {getCurrentFolderName()}
                 </div>
-                <div className="space-y-0.5">
+                <div className="h-[calc(100vh-20rem)] space-y-0.5 overflow-y-auto pr-2">
                   {isSidebarLoading() ? (
                     // Loading state
                     <div className="flex items-center justify-center py-8">
@@ -688,7 +688,7 @@ export default function DashboardLayout({
             <div className="flex h-full flex-1 flex-col">
               {/* Content Header */}
               {pathname === "/dashboard/settings" ? (
-                <div className="flex h-16 w-full items-center justify-between border-b border-gray-200 px-6">
+                <div className="flex h-16 min-h-16 w-full items-center justify-between border-b border-gray-200 px-6">
                   <div className="flex items-center space-x-3">
                     <Link
                       href="/dashboard"
@@ -708,7 +708,7 @@ export default function DashboardLayout({
                   </div> */}
                 </div>
               ) : (
-                <div className="flex h-16 w-full items-center justify-between border-b border-gray-200 px-6">
+                <div className="flex h-16 min-h-16 w-full items-center justify-between border-b border-gray-200 px-6">
                   <div className="flex items-center">
                     {pathname.startsWith("/dashboard/") &&
                     pathname !== "/dashboard" ? (
