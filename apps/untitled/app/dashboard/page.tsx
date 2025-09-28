@@ -5,7 +5,15 @@ import { getFileIcon } from "@/lib/file-icons";
 import { useDragDrop } from "@/lib/hooks/use-drag-drop";
 import { useItemOperations, useItems } from "@/lib/hooks/use-item-operations";
 import { usePagination } from "@/lib/hooks/use-pagination";
-import { ArrowUpDown, Download, Eye, Trash2, Upload } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowUpDown,
+  Download,
+  Eye,
+  Folder,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import toast from "react-hot-toast";
@@ -74,7 +82,7 @@ export default function Home() {
     return (
       <div className="flex h-full flex-1 items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 text-red-500">⚠️</div>
+          <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-red-500" />
           <h3 className="mb-2 text-lg font-medium text-gray-900">
             Failed to load items
           </h3>
@@ -95,160 +103,180 @@ export default function Home() {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <div className="my-6 mr-6 ml-3 overflow-x-auto">
-          <table className="w-full min-w-[800px]">
-            <thead>
-              <tr className="border-b border-gray-100 text-left text-sm text-gray-500">
-                <th className="w-12 pb-3 pl-3 font-medium">
-                  <input
-                    type="checkbox"
-                    checked={isAllSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = isIndeterminate;
-                    }}
-                    onChange={toggleSelectAll}
-                    className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                  />
-                </th>
-                <th className="pb-3 font-medium">
-                  <div className="flex items-center space-x-2">
-                    <span>Name</span>
-                    <ArrowUpDown className="h-4 w-4" />
-                  </div>
-                </th>
-                <th className="pb-3 font-medium">Type</th>
-                <th className="pb-3 font-medium">Size</th>
-                <th className="pb-3 font-medium">Last modified</th>
-                <th className="pb-3 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {files.map((file, index) => (
-                <tr key={index} className="group hover:bg-gray-50">
-                  <td className="py-4 pl-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedFiles.includes(file.id)}
-                      onChange={() => toggleFileSelection(file.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                    />
-                  </td>
-                  <td className="py-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="text-2xl">
-                        {getFileIcon(file.type, file.name)}
-                      </div>
-                      {file.isFolder ? (
-                        <Link
-                          href={`/dashboard/${encodeURIComponent(file.name)}`}
-                          className="text-sm font-medium text-gray-900 hover:text-green-600"
-                        >
-                          {file.name}
-                        </Link>
-                      ) : (
-                        <span className="text-sm font-medium text-gray-900">
-                          {file.name}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-4">
-                    {file.type !== "folder" && (
-                      <span
-                        className={
-                          "inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600"
-                        }
-                      >
-                        {file.type}
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-4 text-sm text-gray-500">{file.size}</td>
-                  <td className="py-4 text-sm text-gray-500">
-                    {file.lastModified}
-                  </td>
-                  <td className="py-4">
-                    {!file.isFolder && (
+        {allFiles.length === 0 ? (
+          // Empty state
+          <div className="flex min-h-[calc(100vh-4rem)] min-w-[800px] items-center justify-center">
+            <div className="text-center">
+              <Folder className="mx-auto h-12 w-12 text-gray-300" />
+              <h3 className="mt-4 text-lg font-medium text-gray-900">
+                Your disposal space is empty
+              </h3>
+              <p className="mt-2 text-sm text-gray-500">
+                Start by uploading files or folders to organize your digital
+                assets.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="my-6 mr-6 ml-3 overflow-x-auto">
+              <table className="w-full min-w-[800px]">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left text-sm text-gray-500">
+                    <th className="w-12 pb-3 pl-3 font-medium">
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = isIndeterminate;
+                        }}
+                        onChange={toggleSelectAll}
+                        className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                      />
+                    </th>
+                    <th className="pb-3 font-medium">
                       <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => {
-                            const previewPromise = itemOperations.preview(
-                              file.id,
-                            );
-                            toast.promise(previewPromise, {
-                              loading: `Opening preview for "${file.name}"...`,
-                              success: `Preview opened for "${file.name}"`,
-                              error: (err) =>
-                                `Failed to preview "${file.name}": ${err instanceof Error ? err.message : "Preview failed"}`,
-                            });
-                          }}
-                          disabled={itemOperations.isDownloading}
-                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
-                          title="Preview file"
-                        >
-                          <Eye className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            const downloadPromise = itemOperations.download(
-                              file.id,
-                              file.name,
-                            );
-                            toast.promise(downloadPromise, {
-                              loading: `Downloading "${file.name}"...`,
-                              success: `Downloaded "${file.name}"`,
-                              error: (err) =>
-                                `Failed to download "${file.name}": ${err instanceof Error ? err.message : "Download failed"}`,
-                            });
-                          }}
-                          disabled={itemOperations.isDownloading}
-                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
-                          title="Download file"
-                        >
-                          <Download className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            const deletePromise = itemOperations.delete(
-                              file.id,
-                            );
-                            toast.promise(deletePromise, {
-                              loading: `Deleting "${file.name}"...`,
-                              success: `"${file.name}" deleted successfully`,
-                              error: (err) =>
-                                err instanceof Error
-                                  ? err.message
-                                  : "Delete failed",
-                            });
-                          }}
-                          disabled={itemOperations.isDeleting}
-                          className="inline-flex items-center rounded-md border border-red-300 bg-white px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
-                          title="Delete file"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
+                        <span>Name</span>
+                        <ArrowUpDown className="h-4 w-4" />
                       </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    </th>
+                    <th className="pb-3 font-medium">Type</th>
+                    <th className="pb-3 font-medium">Size</th>
+                    <th className="pb-3 font-medium">Last modified</th>
+                    <th className="pb-3 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {files.map((file, index) => (
+                    <tr key={index} className="group hover:bg-gray-50">
+                      <td className="py-4 pl-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedFiles.includes(file.id)}
+                          onChange={() => toggleFileSelection(file.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                        />
+                      </td>
+                      <td className="py-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="text-2xl">
+                            {getFileIcon(file.type, file.name)}
+                          </div>
+                          {file.isFolder ? (
+                            <Link
+                              href={`/dashboard/${encodeURIComponent(file.name)}`}
+                              className="text-sm font-medium text-gray-900 hover:text-green-600"
+                            >
+                              {file.name}
+                            </Link>
+                          ) : (
+                            <span className="text-sm font-medium text-gray-900">
+                              {file.name}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4">
+                        {file.type !== "folder" && (
+                          <span
+                            className={
+                              "inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600"
+                            }
+                          >
+                            {file.type}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-4 text-sm text-gray-500">
+                        {file.size}
+                      </td>
+                      <td className="py-4 text-sm text-gray-500">
+                        {file.lastModified}
+                      </td>
+                      <td className="py-4">
+                        {!file.isFolder && (
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => {
+                                const previewPromise = itemOperations.preview(
+                                  file.id,
+                                );
+                                toast.promise(previewPromise, {
+                                  loading: `Opening preview for "${file.name}"...`,
+                                  success: `Preview opened for "${file.name}"`,
+                                  error: (err) =>
+                                    `Failed to preview "${file.name}": ${err instanceof Error ? err.message : "Preview failed"}`,
+                                });
+                              }}
+                              disabled={itemOperations.isDownloading}
+                              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
+                              title="Preview file"
+                            >
+                              <Eye className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                const downloadPromise = itemOperations.download(
+                                  file.id,
+                                  file.name,
+                                );
+                                toast.promise(downloadPromise, {
+                                  loading: `Downloading "${file.name}"...`,
+                                  success: `Downloaded "${file.name}"`,
+                                  error: (err) =>
+                                    `Failed to download "${file.name}": ${err instanceof Error ? err.message : "Download failed"}`,
+                                });
+                              }}
+                              disabled={itemOperations.isDownloading}
+                              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
+                              title="Download file"
+                            >
+                              <Download className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                const deletePromise = itemOperations.delete(
+                                  file.id,
+                                );
+                                toast.promise(deletePromise, {
+                                  loading: `Deleting "${file.name}"...`,
+                                  success: `"${file.name}" deleted successfully`,
+                                  error: (err) =>
+                                    err instanceof Error
+                                      ? err.message
+                                      : "Delete failed",
+                                });
+                              }}
+                              disabled={itemOperations.isDeleting}
+                              className="inline-flex items-center rounded-md border border-red-300 bg-white px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
+                              title="Delete file"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-        {/* Pagination */}
-        <Pagination
-          currentPage={pagination.currentPage}
-          totalPages={pagination.totalPages}
-          hasNextPage={pagination.hasNextPage}
-          hasPreviousPage={pagination.hasPreviousPage}
-          onPageChange={pagination.goToPage}
-          onNextPage={pagination.goToNextPage}
-          onPreviousPage={pagination.goToPreviousPage}
-          totalItems={allFiles.length}
-          startIndex={pagination.startIndex}
-          endIndex={pagination.endIndex}
-        />
+            {/* Pagination */}
+            <Pagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              hasNextPage={pagination.hasNextPage}
+              hasPreviousPage={pagination.hasPreviousPage}
+              onPageChange={pagination.goToPage}
+              onNextPage={pagination.goToNextPage}
+              onPreviousPage={pagination.goToPreviousPage}
+              totalItems={allFiles.length}
+              startIndex={pagination.startIndex}
+              endIndex={pagination.endIndex}
+            />
+          </>
+        )}
 
         {/* Upload Progress */}
         {uploadingFiles.length > 0 && (

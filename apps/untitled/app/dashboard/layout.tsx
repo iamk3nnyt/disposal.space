@@ -14,6 +14,7 @@ import { useUserStorage } from "@/lib/hooks/use-user-storage";
 import { cn } from "@/lib/utils";
 import { useUser } from "@clerk/nextjs";
 import {
+  AlertTriangle,
   ArrowLeft,
   ChevronDown,
   ChevronRight,
@@ -935,7 +936,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 </div>
               ) : searchError ? (
                 <div className="px-6 py-12 text-center">
-                  <div className="mx-auto h-8 w-8 text-red-500">⚠️</div>
+                  <AlertTriangle className="mx-auto h-8 w-8 text-red-500" />
                   <h3 className="mt-3 text-sm font-medium text-gray-900">
                     Search failed
                   </h3>
