@@ -65,7 +65,7 @@ export default function SettingsPage() {
           action: "Open Billing Portal",
           href:
             process.env.NEXT_PUBLIC_STRIPE_BILLING_URL ||
-            "https://billing.stripe.com/p/login/test_00000000000000",
+            "https://billing.stripe.com/p/login/00w6oI7TX5Pf4UWc2X4gg00",
         },
       ],
     },
