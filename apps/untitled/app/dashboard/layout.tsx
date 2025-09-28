@@ -2,6 +2,7 @@
 
 import { getFileIcon } from "@/lib/file-icons";
 import { useFolderChildren } from "@/lib/hooks/use-folder-children";
+import { useFolderPath } from "@/lib/hooks/use-folder-path";
 import {
   useItemOperations,
   useItems,
@@ -20,6 +21,7 @@ import {
   Folder,
   FolderPlus,
   Home,
+  Loader2,
   MoreHorizontal,
   Plus,
   Search,
@@ -51,7 +53,38 @@ export default function DashboardLayout({
   const router = useRouter();
   const { user } = useUser();
   const { data: storageData } = useUserStorage();
-  const { data: itemsData } = useItems();
+
+  // Get current folder path segments for dynamic content
+  const getCurrentFolderPath = () => {
+    if (pathname === "/dashboard") {
+      return [];
+    }
+
+    const pathSegments = pathname.split("/").filter(Boolean);
+    if (pathSegments.length > 1 && pathSegments[0] === "dashboard") {
+      return pathSegments
+        .slice(1)
+        .map((segment) => decodeURIComponent(segment));
+    }
+
+    return [];
+  };
+
+  const currentFolderPath = getCurrentFolderPath();
+
+  // Get folder data for current path (if in a folder)
+  const {
+    data: folderData,
+    isLoading: isFolderPathLoading,
+    error: folderPathError,
+  } = useFolderPath(currentFolderPath);
+
+  // Get items for current folder (root if no folder, or specific folder if in one)
+  const {
+    data: itemsData,
+    isLoading: isItemsLoading,
+    error: itemsError,
+  } = useItems(currentFolderPath.length === 0 ? null : folderData?.folderId);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const {
@@ -123,7 +156,38 @@ export default function DashboardLayout({
     return "DS";
   };
 
-  // Convert API data to sidebar format with children support
+  // Get current folder name for sidebar title
+  const getCurrentFolderName = () => {
+    if (pathname === "/dashboard") {
+      return "DASHBOARD";
+    }
+
+    // Extract folder name from pathname like /dashboard/folder1/folder2
+    const pathSegments = pathname.split("/").filter(Boolean);
+    if (pathSegments.length > 1 && pathSegments[0] === "dashboard") {
+      // Get the last folder name and decode it
+      const lastSegment = pathSegments[pathSegments.length - 1];
+      const decodedName = decodeURIComponent(lastSegment);
+      return decodedName.toUpperCase();
+    }
+
+    return "DASHBOARD";
+  };
+
+  // Determine overall loading state
+  const isSidebarLoading = () => {
+    // If we're in a folder, we need both folder resolution and items
+    if (currentFolderPath.length > 0) {
+      return isFolderPathLoading || isItemsLoading;
+    }
+    // If we're at root, we only need items
+    return isItemsLoading;
+  };
+
+  // Determine if there's an error
+  const sidebarError = folderPathError || itemsError;
+
+  // Convert current folder's items to sidebar format with children support
   const sidebarItems: SidebarItem[] =
     itemsData?.items.map((item) => ({
       id: item.id,
@@ -444,109 +508,153 @@ export default function DashboardLayout({
               {/* File Tree */}
               <div className="px-4 py-2">
                 <div className="mb-3 text-xs font-medium tracking-wider text-gray-400 uppercase">
-                  DISPOSED
+                  {getCurrentFolderName()}
                 </div>
                 <div className="space-y-0.5">
-                  {sidebarItems.map((item) => (
-                    <div key={item.id}>
-                      <div
-                        className={cn(
-                          "flex items-center space-x-2 rounded-md px-2 py-1 text-sm",
-                          isFolderActive(item.name, 0) ||
-                            hasActiveChild(item.name)
-                            ? "bg-gray-200 text-gray-900"
-                            : "text-gray-700 hover:bg-gray-100",
-                        )}
-                      >
-                        {item.type === "folder" ? (
-                          <Link
-                            href={`/dashboard/${encodeURIComponent(item.name)}`}
-                            className="flex flex-1 cursor-pointer items-center space-x-2 truncate"
-                          >
-                            <Folder className="h-4 w-4 shrink-0" />
-                            <span className="truncate whitespace-nowrap">
-                              {item.name}
-                            </span>
-                          </Link>
-                        ) : (
-                          <div className="flex flex-1 cursor-pointer items-center space-x-2 truncate">
-                            <File className="h-4 w-4 shrink-0" />
-                            <span className="truncate whitespace-nowrap">
-                              {item.name}
-                            </span>
-                          </div>
-                        )}
-                        {item.type === "folder" && (
-                          <div className="flex items-center space-x-1">
-                            <button
-                              className="rounded p-0.5 hover:bg-gray-200"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openFolderActions(item.id, item.name);
-                              }}
+                  {isSidebarLoading() ? (
+                    // Loading state
+                    <div className="flex items-center justify-center py-8">
+                      <div className="flex flex-col items-center space-y-2">
+                        <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                        <span className="text-xs text-gray-500">
+                          Loading...
+                        </span>
+                      </div>
+                    </div>
+                  ) : sidebarError ? (
+                    // Error state
+                    <div className="flex items-center justify-center py-8">
+                      <div className="flex flex-col items-center space-y-2 text-center">
+                        <div className="text-red-400">⚠️</div>
+                        <span className="text-xs text-red-600">
+                          Failed to load folder
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {sidebarError.message}
+                        </span>
+                      </div>
+                    </div>
+                  ) : sidebarItems.length === 0 ? (
+                    // Empty state
+                    <div className="flex items-center justify-center py-8">
+                      <div className="flex flex-col items-center space-y-2 text-center">
+                        <Folder className="h-5 w-5 text-gray-300" />
+                        <span className="text-xs text-gray-500">
+                          This folder is empty
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    // Content state
+                    sidebarItems.map((item) => (
+                      <div key={item.id}>
+                        <div
+                          className={cn(
+                            "flex items-center space-x-2 rounded-md px-2 py-1 text-sm",
+                            isFolderActive(item.name, 0) ||
+                              hasActiveChild(item.name)
+                              ? "bg-gray-200 text-gray-900"
+                              : "text-gray-700 hover:bg-gray-100",
+                          )}
+                        >
+                          {item.type === "folder" ? (
+                            <Link
+                              href={
+                                currentFolderPath.length === 0
+                                  ? `/dashboard/${encodeURIComponent(item.name)}`
+                                  : `/dashboard/${currentFolderPath.map((segment) => encodeURIComponent(segment)).join("/")}/${encodeURIComponent(item.name)}`
+                              }
+                              className="flex flex-1 cursor-pointer items-center space-x-2 truncate"
                             >
-                              <MoreHorizontal className="h-3 w-3" />
-                            </button>
-                            <button
-                              className="rounded p-0.5 hover:bg-gray-200"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                triggerFileUpload(false, item.id);
-                              }}
-                              title="Upload files to this folder"
-                            >
-                              <Plus className="h-3 w-3" />
-                            </button>
-                            <button
-                              className="rounded p-0.5 hover:bg-gray-200"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleSidebarItem(item.id);
-                              }}
-                            >
-                              <ChevronRight
-                                className={`h-3 w-3 transition-transform ${
-                                  expandedFolders.has(item.id)
-                                    ? "rotate-90"
-                                    : ""
-                                }`}
-                              />
-                            </button>
+                              <Folder className="h-4 w-4 shrink-0" />
+                              <span className="truncate whitespace-nowrap">
+                                {item.name}
+                              </span>
+                            </Link>
+                          ) : (
+                            <div className="flex flex-1 cursor-pointer items-center space-x-2 truncate">
+                              <File className="h-4 w-4 shrink-0" />
+                              <span className="truncate whitespace-nowrap">
+                                {item.name}
+                              </span>
+                            </div>
+                          )}
+                          {item.type === "folder" && (
+                            <div className="flex items-center space-x-1">
+                              <button
+                                className="rounded p-0.5 hover:bg-gray-200"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openFolderActions(item.id, item.name);
+                                }}
+                              >
+                                <MoreHorizontal className="h-3 w-3" />
+                              </button>
+                              <button
+                                className="rounded p-0.5 hover:bg-gray-200"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  triggerFileUpload(false, item.id);
+                                }}
+                                title="Upload files to this folder"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                              <button
+                                className="rounded p-0.5 hover:bg-gray-200"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleSidebarItem(item.id);
+                                }}
+                              >
+                                <ChevronRight
+                                  className={`h-3 w-3 transition-transform ${
+                                    expandedFolders.has(item.id)
+                                      ? "rotate-90"
+                                      : ""
+                                  }`}
+                                />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {item.children && expandedFolders.has(item.id) && (
+                          <div className="mt-0.5 ml-6 space-y-0.5">
+                            {item.children.map((child) => (
+                              <div
+                                key={child.id}
+                                className={cn(
+                                  "flex items-center space-x-2 rounded-md px-2 py-0.5 text-sm",
+                                  isFolderActive(child.name, 1)
+                                    ? "bg-gray-200 text-gray-900"
+                                    : "text-gray-600 hover:bg-gray-100",
+                                )}
+                              >
+                                {child.type === "folder" ? (
+                                  <Link
+                                    href={
+                                      currentFolderPath.length === 0
+                                        ? `/dashboard/${encodeURIComponent(item.name)}/${encodeURIComponent(child.name)}`
+                                        : `/dashboard/${currentFolderPath.map((segment) => encodeURIComponent(segment)).join("/")}/${encodeURIComponent(item.name)}/${encodeURIComponent(child.name)}`
+                                    }
+                                    className="flex flex-1 cursor-pointer items-center space-x-2"
+                                  >
+                                    <Folder className="h-3 w-3" />
+                                    <span>{child.name}</span>
+                                  </Link>
+                                ) : (
+                                  <div className="flex flex-1 cursor-pointer items-center space-x-2">
+                                    <File className="h-3 w-3" />
+                                    <span>{child.name}</span>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
-                      {item.children && expandedFolders.has(item.id) && (
-                        <div className="mt-0.5 ml-6 space-y-0.5">
-                          {item.children.map((child) => (
-                            <div
-                              key={child.id}
-                              className={cn(
-                                "flex items-center space-x-2 rounded-md px-2 py-0.5 text-sm",
-                                isFolderActive(child.name, 1)
-                                  ? "bg-gray-200 text-gray-900"
-                                  : "text-gray-600 hover:bg-gray-100",
-                              )}
-                            >
-                              {child.type === "folder" ? (
-                                <Link
-                                  href={`/dashboard/${encodeURIComponent(item.name)}/${encodeURIComponent(child.name)}`}
-                                  className="flex flex-1 cursor-pointer items-center space-x-2"
-                                >
-                                  <Folder className="h-3 w-3" />
-                                  <span>{child.name}</span>
-                                </Link>
-                              ) : (
-                                <div className="flex flex-1 cursor-pointer items-center space-x-2">
-                                  <File className="h-3 w-3" />
-                                  <span>{child.name}</span>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
 
