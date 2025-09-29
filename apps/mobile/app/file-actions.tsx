@@ -14,6 +14,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useFileDownload } from "@/lib/hooks/use-file-download";
+import {
+  showDeleteConfirmation,
+  useItemDelete,
+} from "@/lib/hooks/use-item-delete";
 import { useItemRename } from "@/lib/hooks/use-item-rename";
 import { FileItem } from "@/lib/types";
 
@@ -22,6 +26,7 @@ export default function FileActionsScreen() {
   const fileData = params.fileData as string;
   const downloadMutation = useFileDownload();
   const renameMutation = useItemRename();
+  const deleteMutation = useItemDelete();
 
   // Rename modal state
   const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
@@ -113,21 +118,24 @@ export default function FileActionsScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      "Delete File",
-      `Are you sure you want to delete "${selectedItem.name}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            Alert.alert("Delete", `Deleted ${selectedItem.name}`);
-            // TODO: Implement actual delete functionality
-            router.back();
-          },
-        },
-      ]
+    showDeleteConfirmation(
+      selectedItem.name,
+      selectedItem.isFolder,
+      async () => {
+        try {
+          await deleteMutation.mutateAsync({
+            itemId: selectedItem.id,
+            itemName: selectedItem.name,
+            isFolder: selectedItem.isFolder,
+          });
+
+          // Close the modal after successful deletion
+          router.back();
+        } catch (error) {
+          // Error is handled by the mutation's onError callback
+          console.error("Delete failed:", error);
+        }
+      }
     );
   };
 
@@ -200,12 +208,21 @@ export default function FileActionsScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.actionButton, styles.deleteButton]}
+            style={[
+              styles.actionButton,
+              styles.deleteButton,
+              deleteMutation.isPending && styles.actionButtonDisabled,
+            ]}
             onPress={handleDelete}
+            disabled={deleteMutation.isPending}
           >
-            <IconSymbol name="trash" size={20} color="#dc2626" />
+            {deleteMutation.isPending ? (
+              <ActivityIndicator size={20} color="#dc2626" />
+            ) : (
+              <IconSymbol name="trash" size={20} color="#dc2626" />
+            )}
             <ThemedText style={[styles.actionText, styles.deleteText]}>
-              Delete
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </ThemedText>
           </TouchableOpacity>
         </View>
