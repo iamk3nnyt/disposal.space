@@ -81,11 +81,11 @@ export default function FileActionsScreen() {
     );
   };
 
-  const handleShare = () => {
-    Alert.alert("Share", `Sharing ${selectedItem.name}...`);
-    // TODO: Implement actual share functionality
-    router.back();
-  };
+  // const handleShare = () => {
+  //   Alert.alert("Share", `Sharing ${selectedItem.name}...`);
+  //   // TODO: Implement actual share functionality
+  //   router.back();
+  // };
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -106,10 +106,10 @@ export default function FileActionsScreen() {
             <ThemedText style={styles.actionText}>Download</ThemedText>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
+          {/* <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
             <IconSymbol name="square.and.arrow.up" size={20} color="#16a34a" />
             <ThemedText style={styles.actionText}>Share</ThemedText>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           <TouchableOpacity style={styles.actionButton} onPress={handleRename}>
             <IconSymbol name="pencil" size={20} color="#16a34a" />
