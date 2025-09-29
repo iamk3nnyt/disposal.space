@@ -91,22 +91,30 @@ export function FileList({ parentId, onItemPress, onRefresh }: FileListProps) {
             <ThemedText style={styles.itemName} numberOfLines={1}>
               {item.name}
             </ThemedText>
-            <View style={styles.itemMeta}>
-              {!item.isFolder && item.type && (
-                <View style={styles.typeTag}>
-                  <ThemedText style={styles.typeText}>
-                    {item.type.toUpperCase()}
-                  </ThemedText>
-                </View>
-              )}
-              <ThemedText style={styles.itemDetails}>
-                {item.isFolder ? "" : item.size}
-              </ThemedText>
-            </View>
           </View>
         </View>
+        <View style={styles.itemCenter}>
+          {!item.isFolder && item.type && (
+            <View style={styles.typeTag}>
+              <ThemedText style={styles.typeText}>
+                {item.type.toUpperCase()}
+              </ThemedText>
+            </View>
+          )}
+        </View>
         <View style={styles.itemRight}>
-          <ThemedText style={styles.dateText}>{item.lastModified}</ThemedText>
+          {item.isFolder ? (
+            <ThemedText style={styles.dateTextOnly}>
+              {item.lastModified}
+            </ThemedText>
+          ) : (
+            <>
+              <ThemedText style={styles.sizeText}>{item.size}</ThemedText>
+              <ThemedText style={styles.dateText}>
+                {item.lastModified}
+              </ThemedText>
+            </>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -195,12 +203,15 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
   },
   itemLeft: {
     flexDirection: "row",
     alignItems: "center",
+    flex: 2,
+  },
+  itemCenter: {
     flex: 1,
+    alignItems: "center",
   },
   itemIcon: {
     fontSize: 28,
@@ -219,15 +230,10 @@ const styles = StyleSheet.create({
     color: "#111827",
     marginBottom: 4,
   },
-  itemMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
   typeTag: {
     backgroundColor: "#f3f4f6",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 12,
   },
   typeText: {
@@ -235,14 +241,21 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#6b7280",
   },
-  itemDetails: {
+  itemRight: {
+    flex: 1,
+    alignItems: "flex-end",
+    justifyContent: "center",
+  },
+  sizeText: {
     fontSize: 14,
     color: "#6b7280",
-  },
-  itemRight: {
-    alignItems: "flex-end",
+    marginBottom: 2,
   },
   dateText: {
+    fontSize: 12,
+    color: "#9ca3af",
+  },
+  dateTextOnly: {
     fontSize: 14,
     color: "#6b7280",
   },

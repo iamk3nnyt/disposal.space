@@ -5,7 +5,13 @@ import { useAuth } from "@/lib/hooks/use-auth";
 import { FileItem } from "@/lib/types";
 import { router } from "expo-router";
 import React, { useEffect } from "react";
-import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // Helper function to get user initials
@@ -56,6 +62,12 @@ function getUserEmail(user: any): string {
 
 export default function HomeScreen() {
   const { isLoaded, isSignedIn, isTokenReady, user } = useAuth();
+  const [currentFolderId, setCurrentFolderId] = React.useState<string | null>(
+    null
+  );
+  const [folderPath, setFolderPath] = React.useState<
+    Array<{ id: string | null; name: string }>
+  >([{ id: null, name: "Disposal Space" }]);
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -65,12 +77,19 @@ export default function HomeScreen() {
 
   const handleItemPress = (item: FileItem) => {
     if (item.isFolder) {
-      // TODO: Navigate to folder view
-      Alert.alert("Folder Navigation", `Navigate to folder: ${item.name}`);
+      // Navigate into folder
+      setCurrentFolderId(item.id);
+      setFolderPath((prev) => [...prev, { id: item.id, name: item.name }]);
     } else {
       // TODO: Show file preview/actions
       Alert.alert("File Actions", `File: ${item.name}\nSize: ${item.size}`);
     }
+  };
+
+  const handleBreadcrumbPress = (targetIndex: number) => {
+    const targetFolder = folderPath[targetIndex];
+    setCurrentFolderId(targetFolder.id);
+    setFolderPath((prev) => prev.slice(0, targetIndex + 1));
   };
 
   const handleRefresh = () => {
@@ -117,9 +136,38 @@ export default function HomeScreen() {
             </View>
           </View>
         </View>
+        {folderPath.length > 1 && (
+          <View style={styles.breadcrumbContainer}>
+            <View style={styles.breadcrumbs}>
+              {folderPath.map((folder, index) => (
+                <React.Fragment key={folder.id || "root"}>
+                  <TouchableOpacity
+                    onPress={() => handleBreadcrumbPress(index)}
+                    style={styles.breadcrumbItem}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.breadcrumbText,
+                        index === folderPath.length - 1 &&
+                          styles.breadcrumbActive,
+                      ]}
+                    >
+                      {folder.name}
+                    </ThemedText>
+                  </TouchableOpacity>
+                  {index < folderPath.length - 1 && (
+                    <ThemedText style={styles.breadcrumbSeparator}>
+                      ›
+                    </ThemedText>
+                  )}
+                </React.Fragment>
+              ))}
+            </View>
+          </View>
+        )}
       </View>
       <FileList
-        parentId={null} // Root level items
+        parentId={currentFolderId}
         onItemPress={handleItemPress}
         onRefresh={handleRefresh}
       />
@@ -181,5 +229,34 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: "#6b7280",
+  },
+  breadcrumbContainer: {
+    backgroundColor: "#ffffff",
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  breadcrumbs: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+  breadcrumbItem: {
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  breadcrumbText: {
+    fontSize: 14,
+    color: "#6b7280",
+  },
+  breadcrumbActive: {
+    color: "#111827",
+    fontWeight: "500",
+  },
+  breadcrumbSeparator: {
+    fontSize: 14,
+    color: "#9ca3af",
+    marginHorizontal: 8,
   },
 });

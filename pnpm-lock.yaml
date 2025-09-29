@@ -80,6 +80,9 @@ importers:
       expo-web-browser:
         specifier: ~15.0.7
         version: 15.0.7(expo@54.0.10)(react-native@0.81.4(@babel/core@7.28.4)(@types/react@19.1.14)(react@19.1.0))
+      modern-normalize:
+        specifier: ^3.0.1
+        version: 3.0.1
       react:
         specifier: 19.1.0
         version: 19.1.0
@@ -4831,6 +4834,10 @@ packages:
     resolution: {integrity: sha512-vVqVZQyf3WLx2Shd0qJ9xuvqgAyKPLAiqITEtqW0oIUjzo3PePDd6fW9iFz30ef7Ysp/oiWqbhszeGWW2T6Gzw==}
     engines: {node: '>=10'}
     hasBin: true
+
+  modern-normalize@3.0.1:
+    resolution: {integrity: sha512-VqlMdYi59Uch6fnUPxnpijWUQe+TW6zeWCvyr6Mb7JibheHzSuAAoJi2c71ZwIaWKpECpGpYHoaaBp6rBRr+/g==}
+    engines: {node: '>=6'}
 
   ms@2.0.0:
     resolution: {integrity: sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==}
@@ -11972,6 +11979,8 @@ snapshots:
       minipass: 7.1.2
 
   mkdirp@1.0.4: {}
+
+  modern-normalize@3.0.1: {}
 
   ms@2.0.0: {}
 
