@@ -12,7 +12,7 @@ import { usePagination } from "@/lib/hooks/use-pagination";
 import { useSearch, type SearchResult } from "@/lib/hooks/use-search";
 import { useUserStorage } from "@/lib/hooks/use-user-storage";
 import { cn } from "@/lib/utils";
-import { useUser } from "@clerk/nextjs";
+import { useClerk, useUser } from "@clerk/nextjs";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -50,6 +50,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useUser();
+  const { signOut } = useClerk();
   const { data: storageData } = useUserStorage();
 
   // Get current folder path segments for dynamic content
@@ -250,6 +251,16 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       ? decodeURIComponent(pathSegments[0])
       : "";
     return decodedFirstSegment === folderName;
+  };
+
+  // Handle logout functionality
+  const handleLogout = async () => {
+    try {
+      await signOut({ redirectUrl: "/" });
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast.error("Failed to sign out. Please try again.");
+    }
   };
 
   const openFolderActions = (folderId: string, folderName: string) => {
@@ -715,14 +726,20 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                       <span>Back to Dashboard</span>
                     </Link>
                   </div>
-                  {/* <div className="flex items-center space-x-3">
-                    <button className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
-                      Reset
+                  <div className="flex items-center space-x-3">
+                    <a
+                      href="mailto:kenny@ketryon.com"
+                      className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      Send feedback
+                    </a>
+                    <button
+                      onClick={handleLogout}
+                      className="rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-800"
+                    >
+                      Log out
                     </button>
-                    <button className="rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-800">
-                      Save Changes
-                    </button>
-                  </div> */}
+                  </div>
                 </div>
               ) : (
                 <div className="flex h-16 min-h-16 w-full items-center justify-between border-b border-gray-200 px-6">
