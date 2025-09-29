@@ -1,5 +1,5 @@
 import * as DocumentPicker from "expo-document-picker";
-import { Link, router } from "expo-router";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useItemOperations } from "@/lib/hooks/use-items";
 
@@ -23,21 +24,42 @@ export default function ModalScreen() {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.content}>
-          <ThemedText type="title" style={styles.title}>
-            {!isSignedIn ? "Authentication Required" : "Preparing Upload"}
-          </ThemedText>
-          <ThemedText style={styles.description}>
-            {!isSignedIn
-              ? "Please sign in to upload files to your disposal space"
-              : "Setting up your upload session..."}
-          </ThemedText>
+          <View style={styles.header}>
+            <ThemedText style={styles.title}>
+              {!isSignedIn ? "Authentication Required" : "Preparing Upload"}
+            </ThemedText>
+            <ThemedText style={styles.subtitle}>
+              {!isSignedIn
+                ? "Please sign in to upload files to your disposal space"
+                : "Setting up your upload session..."}
+            </ThemedText>
+          </View>
+
           {!isSignedIn ? (
-            <Link href={"/sign-in" as any} dismissTo style={styles.link}>
-              <ThemedText type="link">Sign In</ThemedText>
-            </Link>
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => router.push("/sign-in")}
+              >
+                <IconSymbol name="person" size={20} color="#16a34a" />
+                <ThemedText style={styles.actionText}>Sign In</ThemedText>
+              </TouchableOpacity>
+            </View>
           ) : (
-            <ActivityIndicator size="large" color="#16a34a" />
+            <View style={styles.actions}>
+              <View style={styles.actionButton}>
+                <ActivityIndicator size={20} color="#16a34a" />
+                <ThemedText style={styles.actionText}>Loading...</ThemedText>
+              </View>
+            </View>
           )}
+
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => router.back()}
+          >
+            <ThemedText style={styles.cancelText}>Cancel</ThemedText>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -101,38 +123,42 @@ export default function ModalScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.content}>
-        <ThemedText type="title" style={styles.title}>
-          Upload Files
-        </ThemedText>
-        <ThemedText style={styles.description}>
-          Select files from your device to upload to your disposal space
-        </ThemedText>
+        <View style={styles.header}>
+          <ThemedText style={styles.title}>Upload Files</ThemedText>
+          <ThemedText style={styles.subtitle}>
+            Select files from your device to upload to your disposal space
+          </ThemedText>
+        </View>
+
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              isUploading && styles.actionButtonDisabled,
+            ]}
+            onPress={handlePickFiles}
+            disabled={isUploading}
+          >
+            {isUploading ? (
+              <>
+                <ActivityIndicator size={20} color="#16a34a" />
+                <ThemedText style={styles.actionText}>Uploading...</ThemedText>
+              </>
+            ) : (
+              <>
+                <IconSymbol name="plus" size={20} color="#16a34a" />
+                <ThemedText style={styles.actionText}>Select Files</ThemedText>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
-          style={[
-            styles.uploadButton,
-            isUploading && styles.uploadButtonDisabled,
-          ]}
-          onPress={handlePickFiles}
-          disabled={isUploading}
+          style={styles.cancelButton}
+          onPress={() => router.back()}
         >
-          {isUploading ? (
-            <View style={styles.uploadingContent}>
-              <ActivityIndicator size="small" color="#fff" />
-              <ThemedText style={styles.uploadButtonText}>
-                Uploading...
-              </ThemedText>
-            </View>
-          ) : (
-            <ThemedText style={styles.uploadButtonText}>
-              📁 Select Files
-            </ThemedText>
-          )}
+          <ThemedText style={styles.cancelText}>Cancel</ThemedText>
         </TouchableOpacity>
-
-        <Link href="/" dismissTo style={styles.link}>
-          <ThemedText type="link">Cancel</ThemedText>
-        </Link>
       </View>
     </SafeAreaView>
   );
@@ -141,50 +167,63 @@ export default function ModalScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#ffffff",
   },
   content: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
     padding: 20,
+    justifyContent: "center",
+  },
+  header: {
+    alignItems: "center",
+    marginBottom: 40,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 16,
-    textAlign: "center",
-  },
-  description: {
-    textAlign: "center",
-    marginBottom: 40,
-    opacity: 0.7,
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  uploadButton: {
-    backgroundColor: "#16a34a",
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-    minWidth: 200,
-    alignItems: "center",
-  },
-  uploadButtonDisabled: {
-    opacity: 0.7,
-  },
-  uploadButtonText: {
-    color: "#fff",
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: "600",
+    color: "#111827",
+    marginBottom: 8,
+    textAlign: "center",
   },
-  uploadingContent: {
+  subtitle: {
+    fontSize: 16,
+    color: "#6b7280",
+    textAlign: "center",
+  },
+  actions: {
+    marginBottom: 40,
+  },
+  actionButton: {
     flexDirection: "row",
     alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: "#f9fafb",
+    marginBottom: 12,
   },
-  link: {
-    marginTop: 15,
-    paddingVertical: 15,
+  actionButtonDisabled: {
+    opacity: 0.7,
+  },
+  actionText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#111827",
+    marginLeft: 12,
+  },
+  cancelButton: {
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: "#f3f4f6",
+  },
+  cancelText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#6b7280",
   },
 });

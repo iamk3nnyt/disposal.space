@@ -27,6 +27,8 @@ const MAPPING = {
   "square.and.arrow.up": "share",
   pencil: "edit",
   trash: "delete",
+  gear: "settings",
+  person: "person",
 } as IconMapping;
 
 /**
