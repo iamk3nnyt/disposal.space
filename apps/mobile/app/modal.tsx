@@ -17,21 +17,27 @@ import { useItemOperations } from "@/lib/hooks/use-items";
 export default function ModalScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const { uploadFiles } = useItemOperations();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isTokenReady } = useAuth();
 
-  if (!isSignedIn) {
+  if (!isSignedIn || !isTokenReady) {
     return (
       <ThemedView style={styles.container}>
         <View style={styles.content}>
           <ThemedText type="title" style={styles.title}>
-            Authentication Required
+            {!isSignedIn ? "Authentication Required" : "Preparing Upload"}
           </ThemedText>
           <ThemedText style={styles.description}>
-            Please sign in to upload files to your disposal space
+            {!isSignedIn
+              ? "Please sign in to upload files to your disposal space"
+              : "Setting up your upload session..."}
           </ThemedText>
-          <Link href={"/sign-in" as any} dismissTo style={styles.link}>
-            <ThemedText type="link">Sign In</ThemedText>
-          </Link>
+          {!isSignedIn ? (
+            <Link href={"/sign-in" as any} dismissTo style={styles.link}>
+              <ThemedText type="link">Sign In</ThemedText>
+            </Link>
+          ) : (
+            <ActivityIndicator size="large" color="#16a34a" />
+          )}
         </View>
       </ThemedView>
     );

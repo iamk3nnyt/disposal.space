@@ -9,7 +9,7 @@ import React, { useEffect } from "react";
 import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
 
 export default function HomeScreen() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, isTokenReady } = useAuth();
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -31,11 +31,13 @@ export default function HomeScreen() {
     console.log("Refreshing file list...");
   };
 
-  if (!isLoaded) {
+  if (!isLoaded || !isTokenReady) {
     return (
       <ThemedView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#16a34a" />
-        <ThemedText style={styles.loadingText}>Loading...</ThemedText>
+        <ThemedText style={styles.loadingText}>
+          {!isLoaded ? "Loading..." : "Preparing your disposal space..."}
+        </ThemedText>
       </ThemedView>
     );
   }
