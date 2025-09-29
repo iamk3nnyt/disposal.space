@@ -1,6 +1,7 @@
 import { FileList } from "@/components/file-list";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { FileItem } from "@/lib/types";
 import { router } from "expo-router";
@@ -182,7 +183,7 @@ export default function HomeScreen() {
         onPress={handleUploadPress}
         activeOpacity={0.8}
       >
-        <ThemedText style={styles.fabIcon}>+</ThemedText>
+        <IconSymbol name="plus" size={24} color="#ffffff" />
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -290,11 +291,5 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-  },
-  fabIcon: {
-    fontSize: 24,
-    fontWeight: "300",
-    color: "#ffffff",
-    lineHeight: 24,
   },
 });
