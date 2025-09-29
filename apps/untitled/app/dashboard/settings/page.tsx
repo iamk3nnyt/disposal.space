@@ -95,7 +95,7 @@ export default function SettingsPage() {
             <div className="mb-8">
               <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
               <p className="mt-2 text-gray-600">
-                Manage your disposal space preferences and account settings.
+                Monitor storage usage and manage account settings
               </p>
             </div>
 

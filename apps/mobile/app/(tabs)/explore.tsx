@@ -42,21 +42,6 @@ export default function SettingsScreen() {
 
   const settingsItems = [
     {
-      title: "Account",
-      items: [
-        {
-          label: "Email",
-          value: user?.emailAddresses?.[0]?.emailAddress || "Not available",
-          onPress: () => Alert.alert("Info", "Email management coming soon"),
-        },
-        {
-          label: "Name",
-          value: user?.fullName || "Not set",
-          onPress: () => Alert.alert("Info", "Profile editing coming soon"),
-        },
-      ],
-    },
-    {
       title: "Storage",
       items: [
         {
@@ -112,7 +97,7 @@ export default function SettingsScreen() {
             Settings
           </ThemedText>
           <ThemedText style={styles.subtitle}>
-            Manage your account and preferences
+            Monitor storage usage and manage account settings
           </ThemedText>
         </View>
 

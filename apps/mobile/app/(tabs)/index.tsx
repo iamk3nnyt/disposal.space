@@ -8,8 +8,54 @@ import React, { useEffect } from "react";
 import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+// Helper function to get user initials
+function getUserInitials(user: any): string {
+  if (!user) return "DS";
+
+  const firstName = user.firstName || "";
+  const lastName = user.lastName || "";
+
+  if (firstName && lastName) {
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  } else if (firstName) {
+    return firstName.charAt(0).toUpperCase();
+  } else if (user.fullName) {
+    const nameParts = user.fullName.split(" ");
+    if (nameParts.length >= 2) {
+      return `${nameParts[0].charAt(0)}${nameParts[nameParts.length - 1].charAt(0)}`.toUpperCase();
+    }
+    return nameParts[0].charAt(0).toUpperCase();
+  } else if (user.emailAddresses?.[0]?.emailAddress) {
+    return user.emailAddresses[0].emailAddress.charAt(0).toUpperCase();
+  }
+
+  return "DS";
+}
+
+// Helper function to get user display name
+function getUserDisplayName(user: any): string {
+  if (!user) return "Disposal Space";
+
+  if (user.firstName && user.lastName) {
+    return `${user.firstName} ${user.lastName}`;
+  } else if (user.fullName) {
+    return user.fullName;
+  } else if (user.firstName) {
+    return user.firstName;
+  }
+
+  return "Disposal Space";
+}
+
+// Helper function to get user email
+function getUserEmail(user: any): string {
+  if (!user) return "Hidden Archive";
+
+  return user.emailAddresses?.[0]?.emailAddress || "Hidden Archive";
+}
+
 export default function HomeScreen() {
-  const { isLoaded, isSignedIn, isTokenReady } = useAuth();
+  const { isLoaded, isSignedIn, isTokenReady, user } = useAuth();
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -57,12 +103,16 @@ export default function HomeScreen() {
         <View style={styles.headerContent}>
           <View style={styles.brandContainer}>
             <View style={styles.brandIcon}>
-              <ThemedText style={styles.brandIconText}>DS</ThemedText>
+              <ThemedText style={styles.brandIconText}>
+                {getUserInitials(user)}
+              </ThemedText>
             </View>
             <View>
-              <ThemedText style={styles.brandTitle}>Disposal Space</ThemedText>
+              <ThemedText style={styles.brandTitle}>
+                {getUserDisplayName(user)}
+              </ThemedText>
               <ThemedText style={styles.brandSubtitle}>
-                Hidden Archive
+                {getUserEmail(user)}
               </ThemedText>
             </View>
           </View>
