@@ -35,6 +35,11 @@ export interface UploadProgress {
   size: string;
   status: "uploading" | "processing" | "completed" | "error";
   error?: string;
+  isFolder?: boolean;
+  fileCount?: {
+    total: number;
+    processed: number;
+  };
 }
 
 export interface UploadError extends Error {
@@ -337,7 +342,7 @@ async function uploadFilesWithProgress(
   const formData = new FormData();
 
   // Add files to form data with path information
-  files.forEach((file, index) => {
+  files.forEach((file) => {
     formData.append("files", file);
 
     // Add the webkitRelativePath separately if it exists
@@ -354,13 +359,51 @@ async function uploadFilesWithProgress(
     formData.append("parentId", parentId);
   }
 
-  // Initialize progress tracking
-  const initialProgress: UploadProgress[] = files.map((file) => ({
-    fileName: file.name,
-    progress: 0,
-    size: formatFileSize(file.size),
-    status: "uploading" as const,
-  }));
+  // Helper function to detect folder uploads and extract folder name
+  const detectFolderUpload = (files: File[]) => {
+    const filesWithPaths = files.filter((file) => {
+      const relativePath = (file as File & { webkitRelativePath?: string })
+        .webkitRelativePath;
+      return relativePath && relativePath.includes("/");
+    });
+
+    if (filesWithPaths.length === 0) return null;
+
+    // Extract root folder name from the first file's path
+    const firstPath = (
+      filesWithPaths[0] as File & { webkitRelativePath?: string }
+    ).webkitRelativePath;
+    if (!firstPath) return null;
+
+    const rootFolder = firstPath.split("/")[0];
+    return rootFolder;
+  };
+
+  // Initialize progress tracking with hybrid approach
+  const folderName = detectFolderUpload(files);
+  const isFromFolder = folderName !== null;
+
+  const initialProgress: UploadProgress[] = isFromFolder
+    ? [
+        {
+          fileName: `📁 ${folderName}`,
+          progress: 0,
+          size: `0 of ${files.length} files`,
+          status: "uploading" as const,
+          isFolder: true,
+          fileCount: {
+            total: files.length,
+            processed: 0,
+          },
+        },
+      ]
+    : files.map((file) => ({
+        fileName: file.name,
+        progress: 0,
+        size: formatFileSize(file.size),
+        status: "uploading" as const,
+        isFolder: false,
+      }));
 
   try {
     // Use unified streaming endpoint
@@ -398,25 +441,59 @@ async function uploadFilesWithProgress(
 
             if (eventData.category === "upload") {
               if (eventData.type === "progress") {
-                // Update progress based on server-side events
-                const updatedProgress = initialProgress.map((item) => ({
-                  ...item,
-                  progress: eventData.data.progress || 0,
-                  status:
-                    eventData.data.phase === "completed"
-                      ? ("completed" as const)
-                      : eventData.data.phase === "uploading"
-                        ? ("uploading" as const)
-                        : ("processing" as const),
-                }));
+                // Update progress based on server-side events with hybrid approach
+                const updatedProgress = initialProgress.map((item) => {
+                  // Ensure monotonic progress - never go backwards
+                  const newProgress = Math.max(
+                    item.progress || 0,
+                    eventData.data.progress || 0,
+                  );
 
+                  const baseUpdate = {
+                    ...item,
+                    progress: newProgress,
+                    status:
+                      eventData.data.phase === "completed"
+                        ? ("completed" as const)
+                        : eventData.data.phase === "uploading"
+                          ? ("uploading" as const)
+                          : ("processing" as const),
+                  };
+
+                  // Update folder progress with file count
+                  if (
+                    item.isFolder &&
+                    eventData.data.processedFiles !== undefined
+                  ) {
+                    return {
+                      ...baseUpdate,
+                      size: `${eventData.data.processedFiles} of ${eventData.data.totalFiles} files`,
+                      fileCount: {
+                        total: eventData.data.totalFiles,
+                        processed: eventData.data.processedFiles,
+                      },
+                    };
+                  }
+
+                  return baseUpdate;
+                });
+
+                // Update the initialProgress reference for next iteration
+                initialProgress.splice(
+                  0,
+                  initialProgress.length,
+                  ...updatedProgress,
+                );
                 onProgress?.(updatedProgress);
               } else if (eventData.type === "completed") {
-                // Mark all as completed
+                // Mark all as completed with final counts
                 const completedProgress = initialProgress.map((item) => ({
                   ...item,
                   progress: 100,
                   status: "completed" as const,
+                  size: item.isFolder
+                    ? `${item.fileCount?.total || files.length} files completed`
+                    : item.size,
                 }));
 
                 onProgress?.(completedProgress);

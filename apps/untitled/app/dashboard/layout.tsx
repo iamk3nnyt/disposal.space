@@ -836,31 +836,41 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               {/* Upload Progress */}
               {uploadingFiles.length > 0 && (
                 <div className="fixed right-4 bottom-4 w-80 space-y-2">
-                  {uploadingFiles.map((file) => (
+                  {uploadingFiles.map((file, index) => (
                     <div
-                      key={file.fileName}
+                      key={index}
                       className="rounded-lg border border-gray-200 bg-white p-4 shadow-lg"
                     >
                       <div className="mb-2 flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          {file.status === "error" ? (
-                            <X className="h-4 w-4 text-red-500" />
-                          ) : file.status === "completed" ? (
-                            <Upload className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <Upload className="h-4 w-4 animate-pulse text-blue-500" />
+                        <div className="flex items-center space-x-2 truncate">
+                          {!file.isFolder && (
+                            <Upload className="h-4 w-4 shrink-0 text-green-500" />
                           )}
                           <span className="truncate text-sm font-medium text-gray-900">
                             {file.fileName}
                           </span>
                         </div>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs whitespace-nowrap text-gray-500">
                           {file.size}
                         </span>
                       </div>
                       <div className="space-y-1">
                         <div className="flex justify-between text-xs text-gray-500">
-                          <span>Disposing...</span>
+                          <p className="text-xs text-gray-500">
+                            {file.status === "uploading" &&
+                              (file.isFolder
+                                ? "Disposing folder..."
+                                : "Disposing...")}
+                            {file.status === "processing" &&
+                              (file.isFolder
+                                ? "Processing files..."
+                                : "Processing...")}
+                            {file.status === "completed" &&
+                              (file.isFolder
+                                ? "Folder disposed!"
+                                : "Complete!")}
+                            {file.status === "error" && "Error"}
+                          </p>
                           <span>{Math.round(file.progress)}%</span>
                         </div>
                         <div className="h-2 w-full rounded-full bg-gray-200">
@@ -869,12 +879,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                             style={{ width: `${file.progress}%` }}
                           />
                         </div>
-                        {file.error && (
-                          <div className="mt-1 text-xs text-red-600">
-                            {file.error}
-                          </div>
-                        )}
                       </div>
+                      {file.status === "error" && file.error && (
+                        <p className="mt-1 text-xs text-red-600">
+                          {file.error}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>

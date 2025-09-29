@@ -228,20 +228,28 @@ async function handleFileUploadWithSSE(
           return;
         }
 
-        // Process each file
+        // Process each file with proper monotonic progress calculation
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
 
           try {
-            // Progress: File validation
-            const baseProgress = (i / files.length) * 80; // Reserve 80% for file processing
+            // Calculate progress using linear model:
+            // - Each file gets equal allocation: 90% / totalFiles
+            // - Current file phases get remaining 10% / totalFiles
+            // - Ensures monotonic progress that never goes backwards
+            const phaseAllocation = 10 / files.length; // 10% for current file phases
+            const completedFilesProgress = (i / files.length) * 90;
+
+            // Progress: File validation (25% of current file phases)
+            const validationProgress =
+              completedFilesProgress + phaseAllocation * 0.25;
             sendSSEEvent({
               category: "upload",
               type: "progress",
               data: {
                 phase: "processing",
                 message: `Processing ${file.name}...`,
-                progress: baseProgress + 10,
+                progress: Math.round(validationProgress * 100) / 100,
                 totalFiles: files.length,
                 processedFiles: i,
                 currentFile: file.name,
@@ -266,14 +274,16 @@ async function handleFileUploadWithSSE(
             const arrayBuffer = await file.arrayBuffer();
             const buffer = Buffer.from(arrayBuffer);
 
-            // Progress: S3 upload
+            // Progress: S3 upload (75% of current file phases)
+            const uploadProgress =
+              completedFilesProgress + phaseAllocation * 0.75;
             sendSSEEvent({
               category: "upload",
               type: "progress",
               data: {
                 phase: "uploading",
                 message: `Uploading ${file.name} to cloud storage...`,
-                progress: baseProgress + 30,
+                progress: Math.round(uploadProgress * 100) / 100,
                 totalFiles: files.length,
                 processedFiles: i,
                 currentFile: file.name,
@@ -287,14 +297,15 @@ async function handleFileUploadWithSSE(
               clerkUserId,
             );
 
-            // Progress: Database operations
+            // Progress: Database operations (95% of current file phases)
+            const dbProgress = completedFilesProgress + phaseAllocation * 0.95;
             sendSSEEvent({
               category: "upload",
               type: "progress",
               data: {
                 phase: "finalizing",
                 message: `Finalizing ${file.name}...`,
-                progress: baseProgress + 60,
+                progress: Math.round(dbProgress * 100) / 100,
                 totalFiles: files.length,
                 processedFiles: i,
                 currentFile: file.name,
@@ -331,14 +342,15 @@ async function handleFileUploadWithSSE(
               mimeType: uploadResult.mimeType,
             });
 
-            // Progress: File completed
+            // Progress: File completed (full allocation for this file)
+            const fileCompletedProgress = ((i + 1) / files.length) * 90;
             sendSSEEvent({
               category: "upload",
               type: "progress",
               data: {
                 phase: "completed",
                 message: `${file.name} completed successfully`,
-                progress: ((i + 1) / files.length) * 80,
+                progress: Math.round(fileCompletedProgress * 100) / 100,
                 totalFiles: files.length,
                 processedFiles: i + 1,
                 currentFile: file.name,
@@ -359,7 +371,7 @@ async function handleFileUploadWithSSE(
           }
         }
 
-        // Final progress: Updating storage
+        // Final progress: Updating storage (95% total progress)
         sendSSEEvent({
           category: "upload",
           type: "progress",
