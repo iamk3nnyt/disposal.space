@@ -1,5 +1,4 @@
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { useSignIn } from "@clerk/clerk-expo";
 import { Link, router } from "expo-router";
 import React, { useState } from "react";
@@ -13,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -46,7 +46,7 @@ export default function SignInScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
@@ -114,7 +114,7 @@ export default function SignInScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
-    </ThemedView>
+    </SafeAreaView>
   );
 }
 

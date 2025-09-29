@@ -1,5 +1,4 @@
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { useSignUp } from "@clerk/clerk-expo";
 import { Link, router } from "expo-router";
 import React, { useState } from "react";
@@ -13,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -80,7 +80,7 @@ export default function SignUpScreen() {
 
   if (pendingVerification) {
     return (
-      <ThemedView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.keyboardView}
@@ -126,12 +126,12 @@ export default function SignUpScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
-      </ThemedView>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
@@ -254,7 +254,7 @@ export default function SignUpScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
-    </ThemedView>
+    </SafeAreaView>
   );
 }
 

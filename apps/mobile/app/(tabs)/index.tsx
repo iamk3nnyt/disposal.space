@@ -1,12 +1,12 @@
 import { FileList } from "@/components/file-list";
-import { StorageInfo } from "@/components/storage-info";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { FileItem } from "@/lib/types";
 import { router } from "expo-router";
 import React, { useEffect } from "react";
-import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
   const { isLoaded, isSignedIn, isTokenReady } = useAuth();
@@ -52,16 +52,13 @@ export default function HomeScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <StorageInfo />
-      <View style={styles.fileListContainer}>
-        <FileList
-          parentId={null} // Root level items
-          onItemPress={handleItemPress}
-          onRefresh={handleRefresh}
-        />
-      </View>
-    </ThemedView>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <FileList
+        parentId={null} // Root level items
+        onItemPress={handleItemPress}
+        onRefresh={handleRefresh}
+      />
+    </SafeAreaView>
   );
 }
 
@@ -69,9 +66,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
-  },
-  fileListContainer: {
-    flex: 1,
   },
   loadingContainer: {
     flex: 1,

@@ -80,7 +80,8 @@ export function StorageInfo() {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: "#fff",
-    margin: 16,
+    marginHorizontal: 16,
+    marginBottom: 24,
     padding: 16,
     borderRadius: 12,
     shadowColor: "#000",

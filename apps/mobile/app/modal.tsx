@@ -8,9 +8,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useItemOperations } from "@/lib/hooks/use-items";
 
@@ -21,7 +21,7 @@ export default function ModalScreen() {
 
   if (!isSignedIn || !isTokenReady) {
     return (
-      <ThemedView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.content}>
           <ThemedText type="title" style={styles.title}>
             {!isSignedIn ? "Authentication Required" : "Preparing Upload"}
@@ -39,7 +39,7 @@ export default function ModalScreen() {
             <ActivityIndicator size="large" color="#16a34a" />
           )}
         </View>
-      </ThemedView>
+      </SafeAreaView>
     );
   }
 
@@ -99,7 +99,7 @@ export default function ModalScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.content}>
         <ThemedText type="title" style={styles.title}>
           Upload Files
@@ -134,7 +134,7 @@ export default function ModalScreen() {
           <ThemedText type="link">Cancel</ThemedText>
         </Link>
       </View>
-    </ThemedView>
+    </SafeAreaView>
   );
 }
 

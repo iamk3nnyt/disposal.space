@@ -1,6 +1,6 @@
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { useAuth } from "@/lib/hooks/use-auth";
+import { useUserStorage } from "@/lib/hooks/use-user-storage";
 import { router } from "expo-router";
 import React from "react";
 import {
@@ -10,9 +10,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
+  const { data: storageData, isLoading: isLoadingStorage } = useUserStorage();
 
   const handleSignOut = async () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -36,6 +38,8 @@ export default function SettingsScreen() {
     ]);
   };
 
+  const typedStorage = storageData as any;
+
   const settingsItems = [
     {
       title: "Account",
@@ -57,8 +61,25 @@ export default function SettingsScreen() {
       items: [
         {
           label: "Storage Usage",
-          value: "View details in Home tab",
-          onPress: () => router.push("/(tabs)"),
+          value: isLoadingStorage
+            ? "Loading..."
+            : `${Math.round(typedStorage?.usagePercentage || 0)}% used`,
+          description: isLoadingStorage
+            ? "Loading storage information..."
+            : `${typedStorage?.storageUsedFormatted || "0 Bytes"} of ${typedStorage?.storageLimitFormatted || "15 GB"} used`,
+          onPress: () =>
+            Alert.alert("Storage", "Storage management coming soon"),
+        },
+        {
+          label: "Storage Details",
+          value: isLoadingStorage
+            ? "..."
+            : `${typedStorage?.storageLimitFormatted || "15 GB"} available`,
+          description: isLoadingStorage
+            ? "Loading item statistics..."
+            : `${typedStorage?.itemCount || 0} total items (${typedStorage?.fileCount || 0} files, ${typedStorage?.folderCount || 0} folders)`,
+          onPress: () =>
+            Alert.alert("Details", "Detailed storage analytics coming soon"),
         },
       ],
     },
@@ -81,7 +102,7 @@ export default function SettingsScreen() {
   ];
 
   return (
-    <ThemedView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
@@ -109,9 +130,16 @@ export default function SettingsScreen() {
                   onPress={item.onPress}
                 >
                   <View style={styles.settingItemContent}>
-                    <ThemedText style={styles.settingLabel}>
-                      {item.label}
-                    </ThemedText>
+                    <View style={styles.settingLeft}>
+                      <ThemedText style={styles.settingLabel}>
+                        {item.label}
+                      </ThemedText>
+                      {(item as any).description && (
+                        <ThemedText style={styles.settingDescription}>
+                          {(item as any).description}
+                        </ThemedText>
+                      )}
+                    </View>
                     <ThemedText style={styles.settingValue}>
                       {item.value}
                     </ThemedText>
@@ -131,7 +159,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </ThemedView>
+    </SafeAreaView>
   );
 }
 
@@ -189,18 +217,28 @@ const styles = StyleSheet.create({
   settingItemContent: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
+  },
+  settingLeft: {
+    flex: 1,
+    marginRight: 12,
   },
   settingLabel: {
     fontSize: 16,
     fontWeight: "500",
-    flex: 1,
+    marginBottom: 2,
+  },
+  settingDescription: {
+    fontSize: 14,
+    opacity: 0.6,
+    lineHeight: 18,
   },
   settingValue: {
     fontSize: 14,
     opacity: 0.7,
     textAlign: "right",
-    flex: 1,
+    fontWeight: "500",
+    minWidth: 80,
   },
   signOutButton: {
     backgroundColor: "#dc2626",
