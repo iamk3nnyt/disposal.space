@@ -96,6 +96,10 @@ export default function HomeScreen() {
     console.log("Refreshing file list...");
   };
 
+  const handleUploadPress = () => {
+    router.push("/modal");
+  };
+
   if (!isLoaded || !isTokenReady) {
     return (
       <ThemedView style={styles.loadingContainer}>
@@ -171,6 +175,15 @@ export default function HomeScreen() {
         onItemPress={handleItemPress}
         onRefresh={handleRefresh}
       />
+
+      {/* Floating Action Button */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={handleUploadPress}
+        activeOpacity={0.8}
+      >
+        <ThemedText style={styles.fabIcon}>+</ThemedText>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -258,5 +271,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#9ca3af",
     marginHorizontal: 8,
+  },
+  fab: {
+    position: "absolute",
+    bottom: 30, // Closer to tab navigation
+    right: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#16a34a",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  fabIcon: {
+    fontSize: 24,
+    fontWeight: "300",
+    color: "#ffffff",
+    lineHeight: 24,
   },
 });
