@@ -97,7 +97,7 @@ export default function SettingsScreen() {
             Settings
           </ThemedText>
           <ThemedText style={styles.subtitle}>
-            Monitor storage usage and manage account settings
+            Monitor storage usage and account settings
           </ThemedText>
         </View>
 
