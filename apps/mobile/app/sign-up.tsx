@@ -20,6 +20,7 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [legalAccepted, setLegalAccepted] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
   const [code, setCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -35,6 +36,13 @@ export default function SignUpScreen() {
         firstName,
         lastName,
       });
+
+      // Update with legal acceptance
+      if (legalAccepted) {
+        await signUp.update({
+          legalAccepted: true,
+        });
+      }
 
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setPendingVerification(true);
@@ -191,6 +199,27 @@ export default function SignUpScreen() {
               />
             </View>
 
+            <View style={styles.checkboxContainer}>
+              <TouchableOpacity
+                style={styles.checkbox}
+                onPress={() => setLegalAccepted(!legalAccepted)}
+              >
+                <View
+                  style={[
+                    styles.checkboxBox,
+                    legalAccepted && styles.checkboxChecked,
+                  ]}
+                >
+                  {legalAccepted && (
+                    <ThemedText style={styles.checkmark}>✓</ThemedText>
+                  )}
+                </View>
+                <ThemedText style={styles.checkboxLabel}>
+                  I agree to the Terms of Service and Privacy Policy
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+
             <TouchableOpacity
               style={[styles.signUpButton, isLoading && styles.buttonDisabled]}
               onPress={onSignUpPress}
@@ -199,7 +228,8 @@ export default function SignUpScreen() {
                 !emailAddress ||
                 !password ||
                 !firstName ||
-                !lastName
+                !lastName ||
+                !legalAccepted
               }
             >
               {isLoading ? (
@@ -311,5 +341,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#16a34a",
     fontWeight: "500",
+  },
+  checkboxContainer: {
+    marginBottom: 20,
+  },
+  checkbox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  checkboxBox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderColor: "#e5e7eb",
+    borderRadius: 4,
+    marginRight: 12,
+    marginTop: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxChecked: {
+    backgroundColor: "#16a34a",
+    borderColor: "#16a34a",
+  },
+  checkmark: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    flex: 1,
+    lineHeight: 20,
   },
 });
