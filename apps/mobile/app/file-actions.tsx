@@ -1,3 +1,4 @@
+import * as DocumentPicker from "expo-document-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -19,6 +20,7 @@ import {
   useItemDelete,
 } from "@/lib/hooks/use-item-delete";
 import { useItemRename } from "@/lib/hooks/use-item-rename";
+import { useItemOperations } from "@/lib/hooks/use-items";
 import { FileItem } from "@/lib/types";
 
 export default function FileActionsScreen() {
@@ -27,10 +29,14 @@ export default function FileActionsScreen() {
   const downloadMutation = useFileDownload();
   const renameMutation = useItemRename();
   const deleteMutation = useItemDelete();
+  const { uploadFiles } = useItemOperations();
 
   // Rename modal state
   const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
   const [renameValue, setRenameValue] = useState("");
+
+  // Upload state
+  const [isUploading, setIsUploading] = useState(false);
 
   if (!fileData) {
     return (
@@ -117,6 +123,70 @@ export default function FileActionsScreen() {
     setRenameValue("");
   };
 
+  const handleUpload = async () => {
+    if (!selectedItem.isFolder) {
+      Alert.alert("Invalid Action", "You can only upload files to folders.");
+      return;
+    }
+
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets.length > 0) {
+        setIsUploading(true);
+
+        // Create FormData
+        const formData = new FormData();
+
+        result.assets.forEach((asset) => {
+          formData.append("files", {
+            uri: asset.uri,
+            type: asset.mimeType || "application/octet-stream",
+            name: asset.name,
+          } as any);
+        });
+
+        // Add parentId to FormData to upload to the selected folder
+        formData.append("parentId", selectedItem.id);
+
+        try {
+          await uploadFiles.mutateAsync({
+            files: formData,
+            onProgress: (progress) => {
+              console.log("Upload progress:", progress);
+            },
+          });
+
+          Alert.alert(
+            "Upload Successful",
+            `${result.assets.length} file(s) uploaded to "${selectedItem.name}" successfully!`,
+            [
+              {
+                text: "OK",
+                onPress: () => router.back(),
+              },
+            ]
+          );
+        } catch (error) {
+          console.error("Upload error:", error);
+          Alert.alert(
+            "Upload Failed",
+            error instanceof Error ? error.message : "Failed to upload files"
+          );
+        } finally {
+          setIsUploading(false);
+        }
+      }
+    } catch (error) {
+      console.error("File picker error:", error);
+      Alert.alert("Error", "Failed to pick files");
+      setIsUploading(false);
+    }
+  };
+
   const handleDelete = () => {
     showDeleteConfirmation(
       selectedItem.name,
@@ -183,6 +253,27 @@ export default function FileActionsScreen() {
               {downloadMutation.isPending ? "Downloading..." : "Download"}
             </ThemedText>
           </TouchableOpacity>
+
+          {/* Upload button - only show for folders */}
+          {selectedItem.isFolder && (
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                isUploading && styles.actionButtonDisabled,
+              ]}
+              onPress={handleUpload}
+              disabled={isUploading}
+            >
+              {isUploading ? (
+                <ActivityIndicator size={20} color="#16a34a" />
+              ) : (
+                <IconSymbol name="arrow.up.doc" size={20} color="#16a34a" />
+              )}
+              <ThemedText style={styles.actionText}>
+                {isUploading ? "Uploading..." : "Upload Files"}
+              </ThemedText>
+            </TouchableOpacity>
+          )}
 
           {/* <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
             <IconSymbol name="square.and.arrow.up" size={20} color="#16a34a" />
