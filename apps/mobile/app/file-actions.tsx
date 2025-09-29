@@ -1,15 +1,23 @@
 import { router, useLocalSearchParams } from "expo-router";
 import React from "react";
-import { Alert, StyleSheet, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useFileDownload } from "@/lib/hooks/use-file-download";
 import { FileItem } from "@/lib/types";
 
 export default function FileActionsScreen() {
   const params = useLocalSearchParams();
   const fileData = params.fileData as string;
+  const downloadMutation = useFileDownload();
 
   if (!fileData) {
     return (
@@ -34,10 +42,29 @@ export default function FileActionsScreen() {
 
   const selectedItem: FileItem = JSON.parse(fileData);
 
-  const handleDownload = () => {
-    Alert.alert("Download", `Downloading ${selectedItem.name}...`);
-    // TODO: Implement actual download functionality
-    router.back();
+  const handleDownload = async () => {
+    if (selectedItem.isFolder) {
+      Alert.alert("Cannot Download", "Folders cannot be downloaded directly.");
+      return;
+    }
+
+    try {
+      await downloadMutation.mutateAsync({
+        itemId: selectedItem.id,
+        fileName: selectedItem.name,
+        options: {
+          saveToGallery:
+            selectedItem.type.toLowerCase().startsWith("image") ||
+            selectedItem.type.toLowerCase().startsWith("video"),
+        },
+      });
+
+      // Close the modal after successful download
+      router.back();
+    } catch (error) {
+      console.error("Download failed:", error);
+      // Error is handled by the mutation's onError callback
+    }
   };
 
   const handleRename = () => {
@@ -99,11 +126,31 @@ export default function FileActionsScreen() {
 
         <View style={styles.actions}>
           <TouchableOpacity
-            style={styles.actionButton}
+            style={[
+              styles.actionButton,
+              (selectedItem.isFolder || downloadMutation.isPending) &&
+                styles.actionButtonDisabled,
+            ]}
             onPress={handleDownload}
+            disabled={selectedItem.isFolder || downloadMutation.isPending}
           >
-            <IconSymbol name="arrow.down" size={20} color="#16a34a" />
-            <ThemedText style={styles.actionText}>Download</ThemedText>
+            {downloadMutation.isPending ? (
+              <ActivityIndicator size={20} color="#16a34a" />
+            ) : (
+              <IconSymbol
+                name="arrow.down"
+                size={20}
+                color={selectedItem.isFolder ? "#9ca3af" : "#16a34a"}
+              />
+            )}
+            <ThemedText
+              style={[
+                styles.actionText,
+                selectedItem.isFolder && styles.actionTextDisabled,
+              ]}
+            >
+              {downloadMutation.isPending ? "Downloading..." : "Download"}
+            </ThemedText>
           </TouchableOpacity>
 
           {/* <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
@@ -185,6 +232,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#f9fafb",
     marginBottom: 12,
   },
+  actionButtonDisabled: {
+    opacity: 0.5,
+  },
   deleteButton: {
     backgroundColor: "#fef2f2",
   },
@@ -193,6 +243,9 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#111827",
     marginLeft: 12,
+  },
+  actionTextDisabled: {
+    color: "#9ca3af",
   },
   deleteText: {
     color: "#dc2626",

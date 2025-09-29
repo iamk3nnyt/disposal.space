@@ -12,7 +12,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.disposalspace.mobile",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Allow Disposal Space to save photos and videos to your gallery.",
+        "NSPhotoLibraryAddUsageDescription": "Allow Disposal Space to save downloaded files to your photo library."
       }
     },
     "android": {
@@ -32,6 +34,15 @@
     },
     "plugins": [
       "expo-router",
+      "expo-file-system",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Disposal Space to save photos and videos to your gallery.",
+          "savePhotosPermission": "Allow Disposal Space to save photos and videos to your gallery.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
       [
         "expo-splash-screen",
         {

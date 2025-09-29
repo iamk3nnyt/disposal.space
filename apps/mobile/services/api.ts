@@ -137,6 +137,17 @@ export class ApiService {
     });
   }
 
+  // Get preview URL for file download (returns presigned URL)
+  static async getItemPreviewUrl(id: string): Promise<{
+    url: string;
+    fileName: string;
+    mimeType: string;
+    size: number;
+    expiresIn: number;
+  }> {
+    return this.request(`/api/items/${id}?preview=true`);
+  }
+
   static async deleteItem(id: string, permanent: boolean = true) {
     return this.request(`/api/items/${id}?permanent=${permanent}`, {
       method: "DELETE",
