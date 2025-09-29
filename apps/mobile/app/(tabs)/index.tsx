@@ -110,13 +110,16 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   brandTitle: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "500",
     color: "#111827",
+    lineHeight: 16,
   },
   brandSubtitle: {
     fontSize: 12,
     color: "#6b7280",
+    lineHeight: 14,
+    marginTop: 1,
   },
   loadingContainer: {
     flex: 1,

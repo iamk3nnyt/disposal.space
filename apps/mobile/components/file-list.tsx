@@ -2,7 +2,6 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useItems } from "@/lib/hooks/use-items";
 import { FileItem } from "@/lib/types";
-import { formatDate } from "@/lib/utils";
 import React from "react";
 import {
   ActivityIndicator,
@@ -107,9 +106,7 @@ export function FileList({ parentId, onItemPress, onRefresh }: FileListProps) {
           </View>
         </View>
         <View style={styles.itemRight}>
-          <ThemedText style={styles.dateText}>
-            {formatDate(item.lastModified)}
-          </ThemedText>
+          <ThemedText style={styles.dateText}>{item.lastModified}</ThemedText>
         </View>
       </View>
     </TouchableOpacity>
@@ -210,9 +207,11 @@ const styles = StyleSheet.create({
     marginRight: 12,
     width: 32,
     textAlign: "center",
+    lineHeight: 32,
   },
   itemInfo: {
     flex: 1,
+    justifyContent: "center",
   },
   itemName: {
     fontSize: 16,

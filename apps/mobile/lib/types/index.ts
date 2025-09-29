@@ -16,9 +16,6 @@ export interface FileItem {
   lastModified: string;
   isFolder: boolean;
   sizeBytes: number;
-  parentId?: string | null;
-  fileType?: string;
-  mimeType?: string;
 }
 
 export interface ItemsResponse {
