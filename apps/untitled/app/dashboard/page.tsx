@@ -287,17 +287,24 @@ export default function Home() {
                 className="rounded-lg border border-gray-200 bg-white p-4 shadow-lg"
               >
                 <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Upload className="h-4 w-4 text-green-500" />
+                  <div className="flex items-center space-x-2 truncate">
+                    <Upload className="h-4 w-4 shrink-0 text-green-500" />
                     <span className="truncate text-sm font-medium text-gray-900">
                       {file.fileName}
                     </span>
                   </div>
-                  <span className="text-xs text-gray-500">{file.size}</span>
+                  <span className="text-xs whitespace-nowrap text-gray-500">
+                    {file.size}
+                  </span>
                 </div>
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>Disposing...</span>
+                    <p className="text-xs text-gray-500">
+                      {file.status === "uploading" && "Disposing..."}
+                      {file.status === "processing" && "Processing..."}
+                      {file.status === "completed" && "Complete!"}
+                      {file.status === "error" && "Error"}
+                    </p>
                     <span>{Math.round(file.progress)}%</span>
                   </div>
                   <div className="h-2 w-full rounded-full bg-gray-200">
@@ -307,6 +314,9 @@ export default function Home() {
                     />
                   </div>
                 </div>
+                {file.status === "error" && file.error && (
+                  <p className="mt-1 text-xs text-red-600">{file.error}</p>
+                )}
               </div>
             ))}
           </div>

@@ -336,29 +336,30 @@ export default function FolderNavigationPage({
             {uploadingFiles.map((file, index) => (
               <div
                 key={index}
-                className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                className="rounded-lg border border-gray-200 bg-white p-4 shadow-lg"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center space-x-2 truncate">
+                    <Upload className="h-4 w-4 shrink-0 text-green-500" />
+                    <span className="truncate text-sm font-medium text-gray-900">
                       {file.fileName}
-                    </p>
-                    <p className="text-xs text-gray-500">{file.size}</p>
+                    </span>
                   </div>
-                  <div className="ml-4 text-right">
-                    <p className="text-sm font-medium text-gray-900">
-                      {Math.round(file.progress)}%
-                    </p>
+                  <span className="text-xs whitespace-nowrap text-gray-500">
+                    {file.size}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-gray-500">
                     <p className="text-xs text-gray-500">
                       {file.status === "uploading" && "Disposing..."}
                       {file.status === "processing" && "Processing..."}
                       {file.status === "completed" && "Complete!"}
                       {file.status === "error" && "Error"}
                     </p>
+                    <span>{Math.round(file.progress)}%</span>
                   </div>
-                </div>
-                <div className="mt-2">
-                  <div className="h-2 rounded-full bg-gray-200">
+                  <div className="h-2 w-full rounded-full bg-gray-200">
                     <div
                       className="h-2 rounded-full bg-green-500 transition-all duration-300"
                       style={{ width: `${file.progress}%` }}
