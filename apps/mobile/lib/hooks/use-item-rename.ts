@@ -14,33 +14,12 @@ interface RenameItemResponse {
   message: string;
 }
 
-// Validation function for item names
+// Simplified validation function to match untitled app
 function validateItemName(name: string): { isValid: boolean; error?: string } {
   const trimmedName = name.trim();
 
   if (!trimmedName) {
     return { isValid: false, error: "Name cannot be empty" };
-  }
-
-  if (trimmedName.length > 255) {
-    return { isValid: false, error: "Name cannot exceed 255 characters" };
-  }
-
-  // Check for invalid characters (common across file systems)
-  // const invalidChars = /[<>:"/\\|?*\x00-\x1f]/;
-  // if (invalidChars.test(trimmedName)) {
-  //   return { isValid: false, error: "Name contains invalid characters" };
-  // }
-
-  // Check for reserved names (Windows)
-  const reservedNames = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
-  if (reservedNames.test(trimmedName)) {
-    return { isValid: false, error: "Name is reserved and cannot be used" };
-  }
-
-  // Check for names that end with a dot or space
-  if (trimmedName.endsWith(".") || trimmedName.endsWith(" ")) {
-    return { isValid: false, error: "Name cannot end with a dot or space" };
   }
 
   return { isValid: true };
@@ -100,12 +79,9 @@ export function useItemBatchRename() {
       const results: RenameItemResponse[] = [];
 
       for (const request of renameRequests) {
-        // Validate each name
-        const validation = validateItemName(request.newName);
-        if (!validation.isValid) {
-          throw new Error(
-            `Invalid name for "${request.currentName}": ${validation.error}`
-          );
+        // Simple validation - only check for empty names
+        if (!request.newName.trim()) {
+          throw new Error(`Name cannot be empty for "${request.currentName}"`);
         }
 
         // Check if the name actually changed

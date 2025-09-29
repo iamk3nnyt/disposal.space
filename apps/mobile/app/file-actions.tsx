@@ -92,11 +92,11 @@ export default function FileActionsScreen() {
   };
 
   const handleRenameConfirm = async () => {
-    // const validation = validateItemName(renameValue);
-    // if (!validation.isValid) {
-    //   Alert.alert("Invalid Name", validation.error);
-    //   return;
-    // }
+    // Simple validation matching untitled app
+    if (!renameValue.trim()) {
+      Alert.alert("Invalid Name", "Name cannot be empty.");
+      return;
+    }
 
     if (renameValue.trim() === selectedItem.name.trim()) {
       Alert.alert("No Change", "The new name is the same as the current name.");
