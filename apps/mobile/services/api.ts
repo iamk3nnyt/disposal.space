@@ -154,9 +154,12 @@ export class ApiService {
     });
   }
 
-  static async updateItem(id: string, data: { name?: string }) {
+  static async updateItem(
+    id: string,
+    data: { name?: string; parentId?: string }
+  ) {
     return this.request(`/api/items/${id}`, {
-      method: "PATCH",
+      method: "PUT",
       body: JSON.stringify(data),
     });
   }

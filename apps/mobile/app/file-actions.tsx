@@ -1,9 +1,11 @@
 import { router, useLocalSearchParams } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -12,12 +14,18 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useFileDownload } from "@/lib/hooks/use-file-download";
+import { useItemRename } from "@/lib/hooks/use-item-rename";
 import { FileItem } from "@/lib/types";
 
 export default function FileActionsScreen() {
   const params = useLocalSearchParams();
   const fileData = params.fileData as string;
   const downloadMutation = useFileDownload();
+  const renameMutation = useItemRename();
+
+  // Rename modal state
+  const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
 
   if (!fileData) {
     return (
@@ -68,25 +76,40 @@ export default function FileActionsScreen() {
   };
 
   const handleRename = () => {
-    Alert.prompt(
-      "Rename File",
-      "Enter new name:",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Rename",
-          onPress: (newName?: string) => {
-            if (newName && newName.trim()) {
-              Alert.alert("Rename", `Renamed to ${newName}`);
-              // TODO: Implement actual rename functionality
-            }
-          },
-        },
-      ],
-      "plain-text",
-      selectedItem.name
-    );
-    router.back();
+    setRenameValue(selectedItem.name);
+    setIsRenameModalVisible(true);
+  };
+
+  const handleRenameConfirm = async () => {
+    // const validation = validateItemName(renameValue);
+    // if (!validation.isValid) {
+    //   Alert.alert("Invalid Name", validation.error);
+    //   return;
+    // }
+
+    if (renameValue.trim() === selectedItem.name.trim()) {
+      Alert.alert("No Change", "The new name is the same as the current name.");
+      return;
+    }
+
+    try {
+      await renameMutation.mutateAsync({
+        itemId: selectedItem.id,
+        newName: renameValue.trim(),
+        currentName: selectedItem.name,
+      });
+
+      setIsRenameModalVisible(false);
+      router.back();
+    } catch (error) {
+      // Error is handled by the mutation's onError callback
+      console.error("Rename failed:", error);
+    }
+  };
+
+  const handleRenameCancel = () => {
+    setIsRenameModalVisible(false);
+    setRenameValue("");
   };
 
   const handleDelete = () => {
@@ -158,9 +181,22 @@ export default function FileActionsScreen() {
             <ThemedText style={styles.actionText}>Share</ThemedText>
           </TouchableOpacity> */}
 
-          <TouchableOpacity style={styles.actionButton} onPress={handleRename}>
-            <IconSymbol name="pencil" size={20} color="#16a34a" />
-            <ThemedText style={styles.actionText}>Rename</ThemedText>
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              renameMutation.isPending && styles.actionButtonDisabled,
+            ]}
+            onPress={handleRename}
+            disabled={renameMutation.isPending}
+          >
+            {renameMutation.isPending ? (
+              <ActivityIndicator size={20} color="#16a34a" />
+            ) : (
+              <IconSymbol name="pencil" size={20} color="#16a34a" />
+            )}
+            <ThemedText style={styles.actionText}>
+              {renameMutation.isPending ? "Renaming..." : "Rename"}
+            </ThemedText>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -181,6 +217,67 @@ export default function FileActionsScreen() {
           <ThemedText style={styles.cancelText}>Cancel</ThemedText>
         </TouchableOpacity>
       </View>
+
+      {/* Rename Modal */}
+      <Modal
+        visible={isRenameModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleRenameCancel}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>
+                Rename {selectedItem.isFolder ? "Folder" : "File"}
+              </ThemedText>
+              <ThemedText style={styles.modalSubtitle}>
+                Enter a new name for "{selectedItem.name}"
+              </ThemedText>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.textInput}
+                value={renameValue}
+                onChangeText={setRenameValue}
+                placeholder="Enter new name"
+                autoFocus={true}
+                selectTextOnFocus={true}
+                maxLength={255}
+                returnKeyType="done"
+                onSubmitEditing={handleRenameConfirm}
+              />
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={handleRenameCancel}
+              >
+                <ThemedText style={styles.modalCancelText}>Cancel</ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalConfirmButton,
+                  renameMutation.isPending && styles.modalButtonDisabled,
+                ]}
+                onPress={handleRenameConfirm}
+                disabled={renameMutation.isPending || !renameValue.trim()}
+              >
+                {renameMutation.isPending ? (
+                  <ActivityIndicator size={20} color="#ffffff" />
+                ) : (
+                  <ThemedText style={styles.modalConfirmText}>
+                    Rename
+                  </ThemedText>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -261,5 +358,92 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
     color: "#6b7280",
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalHeader: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#111827",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: "#6b7280",
+    textAlign: "center",
+  },
+  inputContainer: {
+    marginBottom: 24,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: "#111827",
+    backgroundColor: "#f9fafb",
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: "#f3f4f6",
+    alignItems: "center",
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#6b7280",
+  },
+  modalConfirmButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: "#16a34a",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalConfirmText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#ffffff",
+  },
+  modalButtonDisabled: {
+    opacity: 0.5,
   },
 });
