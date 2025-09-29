@@ -51,6 +51,28 @@ export interface UserStorage {
   fileCount: number;
 }
 
+export interface UserStorageResponse {
+  user: {
+    id: string;
+    clerkUserId: string;
+    email: string;
+    name: string;
+    storageUsed: number;
+    storageLimit: number;
+    storageUsedFormatted: string;
+    storageLimitFormatted: string;
+    storageUsedPercentage: number;
+    storageAvailable: number;
+    storageAvailableFormatted: string;
+  };
+  stats: {
+    totalItems: number;
+    fileCount: number;
+    folderCount: number;
+    deletedCount: number;
+  };
+}
+
 export interface SearchResult {
   id: string;
   name: string;

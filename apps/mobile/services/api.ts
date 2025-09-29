@@ -160,6 +160,6 @@ export class ApiService {
 
   // User storage
   static async getUserStorage() {
-    return this.request("/api/user/storage");
+    return this.request<any>("/api/user/storage");
   }
 }
