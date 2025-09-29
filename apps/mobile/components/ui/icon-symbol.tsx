@@ -23,6 +23,10 @@ const MAPPING = {
   "chevron.right": "chevron-right",
   plus: "add",
   "arrow.up.doc": "upload",
+  "arrow.down": "download",
+  "square.and.arrow.up": "share",
+  pencil: "edit",
+  trash: "delete",
 } as IconMapping;
 
 /**

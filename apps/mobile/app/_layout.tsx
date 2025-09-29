@@ -52,6 +52,16 @@ export default function RootLayout() {
                   },
                 }}
               />
+              <Stack.Screen
+                name="file-actions"
+                options={{
+                  presentation: "modal",
+                  title: "File Actions",
+                  headerStyle: {
+                    backgroundColor: colorScheme === "dark" ? "#000" : "#fff",
+                  },
+                }}
+              />
             </Stack>
             <StatusBar style="auto" />
           </ThemeProvider>

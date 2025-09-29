@@ -8,7 +8,6 @@ import { router } from "expo-router";
 import React, { useEffect } from "react";
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -82,8 +81,13 @@ export default function HomeScreen() {
       setCurrentFolderId(item.id);
       setFolderPath((prev) => [...prev, { id: item.id, name: item.name }]);
     } else {
-      // TODO: Show file preview/actions
-      Alert.alert("File Actions", `File: ${item.name}\nSize: ${item.size}`);
+      // Navigate to file actions screen
+      router.push({
+        pathname: "/file-actions",
+        params: {
+          fileData: JSON.stringify(item),
+        },
+      });
     }
   };
 
