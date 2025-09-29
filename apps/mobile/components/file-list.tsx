@@ -33,26 +33,37 @@ function getFileIcon(type: string, filename?: string): string {
     case "video":
       return "🎬";
     case "audio":
+    case "mp3":
       return "🎵";
     case "document":
-      if (extension === "pdf") return "📄";
-      if (extension === "docx" || extension === "doc") return "📝";
+    case "pdf":
       return "📄";
+    case "docx":
+    case "doc":
+      return "📝";
     case "spreadsheet":
-      if (extension === "csv") return "📊";
-      return "📈";
+    case "xls":
+    case "xlsx":
+      return "📊";
     case "presentation":
+    case "pptx":
       return "📊";
     case "archive":
+    case "zip":
       return "🗜️";
     case "code":
       if (extension === "js" || extension === "jsx") return "🟨";
       if (extension === "ts" || extension === "tsx") return "🟦";
       if (extension === "py") return "🐍";
       if (extension === "java") return "☕";
-      return "💻";
+      return "💾";
     case "text":
+    case "txt":
       return "📝";
+    case "dmg":
+      return "💿";
+    case "page":
+      return "📄";
     default:
       return "📄";
   }
@@ -81,12 +92,24 @@ export function FileList({ parentId, onItemPress, onRefresh }: FileListProps) {
             <ThemedText style={styles.itemName} numberOfLines={1}>
               {item.name}
             </ThemedText>
-            <ThemedText style={styles.itemDetails}>
-              {item.isFolder
-                ? formatDate(item.lastModified)
-                : `${item.type.toUpperCase()} • ${item.size} • ${formatDate(item.lastModified)}`}
-            </ThemedText>
+            <View style={styles.itemMeta}>
+              {!item.isFolder && item.type && (
+                <View style={styles.typeTag}>
+                  <ThemedText style={styles.typeText}>
+                    {item.type.toUpperCase()}
+                  </ThemedText>
+                </View>
+              )}
+              <ThemedText style={styles.itemDetails}>
+                {item.isFolder ? "" : item.size}
+              </ThemedText>
+            </View>
           </View>
+        </View>
+        <View style={styles.itemRight}>
+          <ThemedText style={styles.dateText}>
+            {formatDate(item.lastModified)}
+          </ThemedText>
         </View>
       </View>
     </TouchableOpacity>
@@ -160,26 +183,22 @@ export function FileList({ parentId, onItemPress, onRefresh }: FileListProps) {
 const styles = StyleSheet.create({
   list: {
     flex: 1,
+    backgroundColor: "#ffffff",
   },
   emptyList: {
     flex: 1,
   },
   itemContainer: {
-    backgroundColor: "#fff",
-    marginHorizontal: 16,
-    marginVertical: 4,
-    borderRadius: 8,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
   },
   itemContent: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   itemLeft: {
     flexDirection: "row",
@@ -187,8 +206,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemIcon: {
-    fontSize: 24,
+    fontSize: 28,
     marginRight: 12,
+    width: 32,
+    textAlign: "center",
   },
   itemInfo: {
     flex: 1,
@@ -196,78 +217,109 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 16,
     fontWeight: "500",
+    color: "#111827",
     marginBottom: 4,
+  },
+  itemMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  typeTag: {
+    backgroundColor: "#f3f4f6",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  typeText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#6b7280",
   },
   itemDetails: {
     fontSize: 14,
-    opacity: 0.6,
+    color: "#6b7280",
+  },
+  itemRight: {
+    alignItems: "flex-end",
+  },
+  dateText: {
+    fontSize: 14,
+    color: "#6b7280",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
+    backgroundColor: "#ffffff",
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    opacity: 0.7,
+    color: "#6b7280",
   },
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 40,
+    backgroundColor: "#ffffff",
   },
   emptyIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-    opacity: 0.3,
+    fontSize: 64,
+    marginBottom: 24,
+    opacity: 0.4,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: "600",
-    marginBottom: 8,
+    marginBottom: 12,
     textAlign: "center",
+    color: "#111827",
   },
   emptySubtitle: {
     fontSize: 16,
-    opacity: 0.7,
+    color: "#6b7280",
     textAlign: "center",
-    lineHeight: 22,
+    lineHeight: 24,
+    maxWidth: 280,
   },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 40,
+    backgroundColor: "#ffffff",
   },
   errorIcon: {
-    fontSize: 48,
-    marginBottom: 16,
+    fontSize: 64,
+    marginBottom: 24,
   },
   errorTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: "600",
-    marginBottom: 8,
+    marginBottom: 12,
     textAlign: "center",
+    color: "#111827",
   },
   errorSubtitle: {
     fontSize: 16,
-    opacity: 0.7,
+    color: "#6b7280",
     textAlign: "center",
-    lineHeight: 22,
-    marginBottom: 20,
+    lineHeight: 24,
+    marginBottom: 32,
+    maxWidth: 280,
   },
   retryButton: {
     backgroundColor: "#16a34a",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     borderRadius: 8,
   },
   retryText: {
-    color: "#fff",
+    color: "#ffffff",
     fontSize: 16,
-    fontWeight: "500",
+    fontWeight: "600",
   },
 });
