@@ -277,7 +277,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
     try {
       const currentParentId =
-        currentFolderPath.length === 0 ? null : folderData?.folderId;
+        currentFolderPath.length === 0
+          ? undefined
+          : folderData?.folderId || undefined;
 
       await toast.promise(
         itemOperations.createFolder(newFolderName.trim(), currentParentId),
