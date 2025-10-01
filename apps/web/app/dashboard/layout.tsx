@@ -108,6 +108,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [isUploadDropdownOpen, setIsUploadDropdownOpen] = useState(false);
   const [isHeaderUploadDropdownOpen, setIsHeaderUploadDropdownOpen] =
     useState(false);
+  const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
 
   // State for tracking expanded folders
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
@@ -260,6 +262,36 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Error signing out:", error);
       toast.error("Failed to sign out. Please try again.");
+    }
+  };
+
+  // Handle create folder functionality
+  const handleCreateFolderClick = () => {
+    setIsUploadDropdownOpen(false);
+    setIsCreateFolderModalOpen(true);
+    setNewFolderName("");
+  };
+
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) return;
+
+    try {
+      const currentParentId =
+        currentFolderPath.length === 0 ? null : folderData?.folderId;
+
+      await toast.promise(
+        itemOperations.createFolder(newFolderName.trim(), currentParentId),
+        {
+          loading: `Creating folder "${newFolderName.trim()}"...`,
+          success: `Folder "${newFolderName.trim()}" created successfully`,
+          error: (err) => `Failed to create folder: ${err.message}`,
+        },
+      );
+
+      setIsCreateFolderModalOpen(false);
+      setNewFolderName("");
+    } catch (error) {
+      console.error("Create folder failed:", error);
     }
   };
 
@@ -501,6 +533,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                       >
                         <FolderPlus className="h-4 w-4" />
                         <span>Upload Folder</span>
+                      </button>
+                      <hr className="my-1 border-gray-100" />
+                      <button
+                        onClick={handleCreateFolderClick}
+                        className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        <Folder className="h-4 w-4" />
+                        <span>Create Folder</span>
                       </button>
                     </div>
                   )}
@@ -1133,6 +1173,84 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Folder Modal */}
+      {isCreateFolderModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-6 w-full max-w-md rounded-xl bg-white shadow-xl">
+            {/* Modal Header */}
+            <div className="flex h-16 items-center justify-between border-b border-gray-200 px-6">
+              <div className="flex items-center space-x-3">
+                <FolderPlus className="h-5 w-5 text-gray-600" />
+                <h2 className="text-base font-medium text-gray-900">
+                  Create New Folder
+                </h2>
+              </div>
+              <button
+                onClick={() => {
+                  setIsCreateFolderModalOpen(false);
+                  setNewFolderName("");
+                }}
+                className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              <div className="mb-6">
+                <p className="text-sm text-gray-600">
+                  Location:{" "}
+                  <span className="font-medium text-gray-900">
+                    {currentFolderPath.length === 0
+                      ? "Root Directory"
+                      : currentFolderPath[currentFolderPath.length - 1]}
+                  </span>
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Folder Name
+                </label>
+                <input
+                  type="text"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
+                  placeholder="Enter folder name"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end space-x-3 border-t border-gray-200 px-6 py-3">
+              <button
+                onClick={() => {
+                  setIsCreateFolderModalOpen(false);
+                  setNewFolderName("");
+                }}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateFolder}
+                disabled={!newFolderName.trim() || itemOperations.isCreating}
+                className="flex items-center space-x-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+              >
+                <FolderPlus className="h-4 w-4" />
+                <span>
+                  {itemOperations.isCreating ? "Creating..." : "Create Folder"}
+                </span>
               </button>
             </div>
           </div>
