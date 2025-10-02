@@ -1,16 +1,34 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { useItemOperations, type UploadProgress } from "./use-item-operations";
+import {
+  getValidationConfig,
+  validateFilesBeforeUpload,
+} from "./use-upload-validation";
+import { useUserStorage } from "./use-user-storage";
 
-export function useDragDrop(parentId?: string) {
+export function useDragDrop(
+  parentId?: string,
+  onValidationError?: (
+    validation: ReturnType<typeof validateFilesBeforeUpload>,
+  ) => void,
+  onProcessingProgress?: (progress: {
+    isProcessing: boolean;
+    processedFiles: number;
+    totalFiles: number;
+    currentFile: string;
+  }) => void,
+) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<UploadProgress[]>([]);
   const itemOperations = useItemOperations();
+  const { data: storageData } = useUserStorage();
 
   // Helper function to recursively process directory entries
   const processDirectory = async (
     directoryEntry: FileSystemDirectoryEntry,
     basePath: string = "",
+    progressCallback?: (fileName: string) => void,
   ): Promise<File[]> => {
     const files: File[] = [];
     const currentPath = basePath
@@ -38,6 +56,11 @@ export function useDragDrop(parentId?: string) {
 
     for (const entry of entries) {
       if (entry.isFile) {
+        // Report progress
+        if (progressCallback) {
+          progressCallback(`${currentPath}/${entry.name}`);
+        }
+
         const file = await new Promise<File>((resolve) => {
           (entry as FileSystemFileEntry).file((originalFile) => {
             // Create a new file with the full path to preserve folder structure
@@ -63,6 +86,7 @@ export function useDragDrop(parentId?: string) {
         const subFiles = await processDirectory(
           entry as FileSystemDirectoryEntry,
           currentPath,
+          progressCallback,
         );
         files.push(...subFiles);
       }
@@ -95,27 +119,114 @@ export function useDragDrop(parentId?: string) {
     if (hasFolder) {
       // Handle folder upload by reconstructing files with paths
       const allFiles: File[] = [];
+      let processedFiles = 0;
+
+      // Start progress tracking
+      if (onProcessingProgress) {
+        onProcessingProgress({
+          isProcessing: true,
+          processedFiles: 0,
+          totalFiles: 0, // We don't know total yet
+          currentFile: "Scanning folders...",
+        });
+      }
 
       for (const item of items) {
         const entry = item.webkitGetAsEntry?.();
         if (entry) {
           if (entry.isFile) {
             // Single file
+            if (onProcessingProgress) {
+              onProcessingProgress({
+                isProcessing: true,
+                processedFiles: processedFiles++,
+                totalFiles: 0,
+                currentFile: entry.name,
+              });
+            }
+
             const file = await new Promise<File>((resolve) => {
               (entry as FileSystemFileEntry).file(resolve);
             });
             allFiles.push(file);
           } else if (entry.isDirectory) {
-            // Recursively process directory
+            // Recursively process directory with progress callback
             const folderFiles = await processDirectory(
               entry as FileSystemDirectoryEntry,
+              "",
+              (fileName) => {
+                if (onProcessingProgress) {
+                  onProcessingProgress({
+                    isProcessing: true,
+                    processedFiles: processedFiles++,
+                    totalFiles: 0,
+                    currentFile: fileName,
+                  });
+                }
+              },
             );
             allFiles.push(...folderFiles);
           }
         }
       }
 
+      // Update progress with final count
+      if (onProcessingProgress) {
+        onProcessingProgress({
+          isProcessing: true,
+          processedFiles: allFiles.length,
+          totalFiles: allFiles.length,
+          currentFile: "Validating files...",
+        });
+      }
+
       if (allFiles.length === 0) return;
+
+      // Pre-validation before upload
+      if (!storageData?.user) {
+        toast.error("Unable to check storage limits. Please try again.");
+        return;
+      }
+
+      const validationConfig = getValidationConfig();
+      const validation = validateFilesBeforeUpload(
+        allFiles,
+        storageData.user,
+        validationConfig,
+      );
+
+      // Clear processing progress
+      if (onProcessingProgress) {
+        onProcessingProgress({
+          isProcessing: false,
+          processedFiles: 0,
+          totalFiles: 0,
+          currentFile: "",
+        });
+      }
+
+      // Show validation errors
+      if (!validation.isValid) {
+        if (onValidationError) {
+          onValidationError(validation);
+        } else {
+          // Fallback to toast notifications if no callback provided
+          validation.errors.forEach((error) => {
+            toast.error(error, { duration: 6000 });
+          });
+        }
+        return;
+      }
+
+      // Show warnings but allow upload to proceed
+      if (validation.warnings.length > 0) {
+        validation.warnings.forEach((warning) => {
+          toast(warning, {
+            duration: 4000,
+            icon: "⚠️",
+          });
+        });
+      }
 
       // Start upload with progress tracking
       try {
@@ -147,6 +258,52 @@ export function useDragDrop(parentId?: string) {
       // Handle regular file upload (fallback to original logic)
       const droppedFiles = Array.from(e.dataTransfer.files);
       if (droppedFiles.length === 0) return;
+
+      // Pre-validation before upload
+      if (!storageData?.user) {
+        toast.error("Unable to check storage limits. Please try again.");
+        return;
+      }
+
+      const validationConfig = getValidationConfig();
+      const validation = validateFilesBeforeUpload(
+        droppedFiles,
+        storageData.user,
+        validationConfig,
+      );
+
+      // Clear processing progress (in case it was running)
+      if (onProcessingProgress) {
+        onProcessingProgress({
+          isProcessing: false,
+          processedFiles: 0,
+          totalFiles: 0,
+          currentFile: "",
+        });
+      }
+
+      // Show validation errors
+      if (!validation.isValid) {
+        if (onValidationError) {
+          onValidationError(validation);
+        } else {
+          // Fallback to toast notifications if no callback provided
+          validation.errors.forEach((error) => {
+            toast.error(error, { duration: 6000 });
+          });
+        }
+        return;
+      }
+
+      // Show warnings but allow upload to proceed
+      if (validation.warnings.length > 0) {
+        validation.warnings.forEach((warning) => {
+          toast(warning, {
+            duration: 4000,
+            icon: "⚠️",
+          });
+        });
+      }
 
       try {
         await itemOperations.uploadFiles(droppedFiles, parentId, (progress) => {

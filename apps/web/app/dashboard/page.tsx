@@ -5,6 +5,8 @@ import { getFileIcon } from "@/lib/file-icons";
 import { useDragDrop } from "@/lib/hooks/use-drag-drop";
 import { useItemOperations, useItems } from "@/lib/hooks/use-item-operations";
 import { usePagination } from "@/lib/hooks/use-pagination";
+import { type ValidationResult } from "@/lib/hooks/use-upload-validation";
+import { formatFileSize } from "@/lib/utils";
 import {
   AlertTriangle,
   ArrowUpDown,
@@ -13,6 +15,7 @@ import {
   Folder,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -20,6 +23,21 @@ import toast from "react-hot-toast";
 
 export default function Home() {
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+  const [validationModal, setValidationModal] = useState<{
+    isOpen: boolean;
+    validation: ValidationResult | null;
+  }>({ isOpen: false, validation: null });
+  const [fileProcessingProgress, setFileProcessingProgress] = useState<{
+    isProcessing: boolean;
+    processedFiles: number;
+    totalFiles: number;
+    currentFile: string;
+  }>({
+    isProcessing: false,
+    processedFiles: 0,
+    totalFiles: 0,
+    currentFile: "",
+  });
 
   const itemOperations = useItemOperations();
   const {
@@ -28,7 +46,18 @@ export default function Home() {
     handleDragOver,
     handleDragLeave,
     handleDrop,
-  } = useDragDrop();
+  } = useDragDrop(
+    undefined,
+    (validation) => {
+      setValidationModal({
+        isOpen: true,
+        validation,
+      });
+    },
+    (progress) => {
+      setFileProcessingProgress(progress);
+    },
+  );
 
   // Fetch items from API
   const { data: itemsData, isLoading, error } = useItems();
@@ -346,6 +375,166 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* File Processing Progress */}
+      {fileProcessingProgress.isProcessing && (
+        <div className="fixed right-4 bottom-4 w-80 rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
+          <div className="flex items-center space-x-3">
+            <div className="flex-shrink-0">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-green-600"></div>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between text-sm">
+                <p className="font-medium text-gray-900">
+                  Processing folder...
+                </p>
+                <span className="text-gray-500">
+                  {fileProcessingProgress.processedFiles} /{" "}
+                  {fileProcessingProgress.totalFiles || "?"}
+                </span>
+              </div>
+              <div className="mt-2">
+                <div className="h-2 w-full rounded-full bg-gray-200">
+                  <div
+                    className="h-2 rounded-full bg-green-500 transition-all duration-300"
+                    style={{
+                      width:
+                        fileProcessingProgress.totalFiles > 0
+                          ? `${(fileProcessingProgress.processedFiles / fileProcessingProgress.totalFiles) * 100}%`
+                          : "0%",
+                    }}
+                  />
+                </div>
+              </div>
+              {fileProcessingProgress.currentFile && (
+                <p className="mt-1 truncate text-xs text-gray-500">
+                  {fileProcessingProgress.currentFile}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Validation Modal - Inlined */}
+      {validationModal.isOpen && validationModal.validation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-6 w-full max-w-lg rounded-xl bg-white shadow-xl">
+            {/* Modal Header */}
+            <div className="flex h-16 items-center justify-between border-b border-gray-200 px-6">
+              <div className="flex items-center space-x-3">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+                <h2 className="text-base font-medium text-gray-900">
+                  Upload Validation Failed
+                </h2>
+              </div>
+              <button
+                onClick={() =>
+                  setValidationModal({ isOpen: false, validation: null })
+                }
+                className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              <div className="mb-6">
+                <p className="text-sm text-gray-600">
+                  Selected:{" "}
+                  <span className="font-medium text-gray-900">
+                    {validationModal.validation.fileCount} files
+                  </span>{" "}
+                  ({formatFileSize(validationModal.validation.totalSize)})
+                </p>
+              </div>
+
+              {/* Errors */}
+              {validationModal.validation.errors.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="mb-2 text-sm font-medium text-red-800">
+                    Issues Found:
+                  </h3>
+                  <div className="space-y-2">
+                    {validationModal.validation.errors.map((error, index) => (
+                      <div
+                        key={index}
+                        className="flex items-start space-x-2 text-sm text-red-700"
+                      >
+                        <span className="mt-0.5 text-red-500">•</span>
+                        <span>{error}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Oversized Files */}
+              {validationModal.validation.oversizedFiles.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="mb-2 text-sm font-medium text-red-800">
+                    Files Exceeding Configured Limits:
+                  </h3>
+                  <div className="max-h-32 overflow-y-auto rounded-md border border-red-200 bg-red-50 p-3">
+                    <div className="space-y-1">
+                      {validationModal.validation.oversizedFiles.map(
+                        (file, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between text-xs text-red-700"
+                          >
+                            <span className="truncate font-medium">
+                              {file.name}
+                            </span>
+                            <span className="ml-2 flex-shrink-0">
+                              {file.formattedSize}
+                            </span>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Warnings */}
+              {validationModal.validation.warnings.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="mb-2 text-sm font-medium text-yellow-800">
+                    Warnings:
+                  </h3>
+                  <div className="space-y-2">
+                    {validationModal.validation.warnings.map(
+                      (warning, index) => (
+                        <div
+                          key={index}
+                          className="flex items-start space-x-2 text-sm text-yellow-700"
+                        >
+                          <span className="mt-0.5 text-yellow-500">•</span>
+                          <span>{warning}</span>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end border-t border-gray-200 px-6 py-3">
+              <button
+                onClick={() =>
+                  setValidationModal({ isOpen: false, validation: null })
+                }
+                className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -38,7 +38,7 @@ export class FileProcessor {
 
   constructor(options: FileProcessorOptions = {}) {
     this.options = {
-      maxFileSize: 100 * 1024 * 1024, // 100MB default
+      maxFileSize: undefined, // No file size limit by default - only user storage limits apply
       allowedTypes: undefined, // Allow all types by default
       generateThumbnail: false,
       ...options,
@@ -51,8 +51,11 @@ export class FileProcessor {
     originalName: string,
     userId: string
   ): Promise<ProcessedFile> {
-    // Validate file size
-    if (!validateFileSize(buffer.length, this.options.maxFileSize)) {
+    // Validate file size (only if a limit is configured)
+    if (
+      this.options.maxFileSize &&
+      !validateFileSize(buffer.length, this.options.maxFileSize)
+    ) {
       throw new Error(
         `File size exceeds limit of ${this.options.maxFileSize} bytes`
       );
@@ -164,16 +167,18 @@ export class FileProcessor {
   }
 }
 
-// Default instance with standard options
-export const fileProcessor = new FileProcessor();
+// Default instance with no file size limits - only user storage limits apply
+export const fileProcessor = new FileProcessor({
+  maxFileSize: undefined, // No hard limit
+});
 
-// Specialized processors
+// Specialized processors (with type restrictions but no size limits)
 export const imageProcessor = new FileProcessor({
   allowedTypes: [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"],
-  maxFileSize: 10 * 1024 * 1024, // 10MB
+  maxFileSize: undefined, // No size limit - only user storage limits apply
 });
 
 export const documentProcessor = new FileProcessor({
   allowedTypes: [".pdf", ".doc", ".docx", ".txt", ".csv"],
-  maxFileSize: 50 * 1024 * 1024, // 50MB
+  maxFileSize: undefined, // No size limit - only user storage limits apply
 });

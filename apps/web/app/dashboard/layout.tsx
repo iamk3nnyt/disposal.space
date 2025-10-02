@@ -10,8 +10,13 @@ import {
 } from "@/lib/hooks/use-item-operations";
 import { usePagination } from "@/lib/hooks/use-pagination";
 import { useSearch, type SearchResult } from "@/lib/hooks/use-search";
+import {
+  getValidationConfig,
+  validateFilesBeforeUpload,
+  type ValidationResult,
+} from "@/lib/hooks/use-upload-validation";
 import { useUserStorage } from "@/lib/hooks/use-user-storage";
-import { cn } from "@/lib/utils";
+import { cn, formatFileSize } from "@/lib/utils";
 import { useClerk, useUser } from "@clerk/nextjs";
 import {
   AlertTriangle,
@@ -110,6 +115,21 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     useState(false);
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [validationModal, setValidationModal] = useState<{
+    isOpen: boolean;
+    validation: ValidationResult | null;
+  }>({ isOpen: false, validation: null });
+  const [fileProcessingProgress, setFileProcessingProgress] = useState<{
+    isProcessing: boolean;
+    processedFiles: number;
+    totalFiles: number;
+    currentFile: string;
+  }>({
+    isProcessing: false,
+    processedFiles: 0,
+    totalFiles: 0,
+    currentFile: "",
+  });
 
   // State for tracking expanded folders
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
@@ -339,16 +359,116 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     closeFolderActions();
   };
 
+  const processFilesWithProgress = async (
+    files: FileList | File[],
+  ): Promise<File[]> => {
+    const fileArray = Array.from(files);
+
+    // Check if this is a folder upload by looking for webkitRelativePath
+    const hasWebkitRelativePath = fileArray.some(
+      (file) =>
+        (file as any).webkitRelativePath &&
+        (file as any).webkitRelativePath !== "",
+    );
+
+    if (!hasWebkitRelativePath) {
+      // Regular file upload - no processing needed
+      return fileArray;
+    }
+
+    // Folder upload - show progress
+    setFileProcessingProgress({
+      isProcessing: true,
+      processedFiles: 0,
+      totalFiles: fileArray.length,
+      currentFile: "",
+    });
+
+    const processedFiles: File[] = [];
+
+    for (let i = 0; i < fileArray.length; i++) {
+      const file = fileArray[i];
+
+      // Update progress
+      setFileProcessingProgress((prev) => ({
+        ...prev,
+        processedFiles: i,
+        currentFile: file.name,
+      }));
+
+      // Small delay to allow UI to update and prevent blocking
+      if (i % 10 === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+      }
+
+      processedFiles.push(file);
+    }
+
+    // Final progress update
+    setFileProcessingProgress((prev) => ({
+      ...prev,
+      processedFiles: fileArray.length,
+      currentFile: "Validating files...",
+    }));
+
+    // Small delay before validation
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    return processedFiles;
+  };
+
   const handleFileUpload = async (
     files: FileList | File[],
     parentId?: string,
   ) => {
-    const fileArray = Array.from(files);
-    if (fileArray.length === 0) return;
+    if (files.length === 0) return;
 
-    // Start upload with progress tracking
     try {
-      await itemOperations.uploadFiles(fileArray, parentId, (progress) => {
+      // Process files with progress feedback
+      const processedFiles = await processFilesWithProgress(files);
+
+      // Clear processing progress
+      setFileProcessingProgress({
+        isProcessing: false,
+        processedFiles: 0,
+        totalFiles: 0,
+        currentFile: "",
+      });
+
+      // Pre-validation before upload
+      if (!storageData?.user) {
+        toast.error("Unable to check storage limits. Please try again.");
+        return;
+      }
+
+      const validationConfig = getValidationConfig();
+      const validation = validateFilesBeforeUpload(
+        processedFiles,
+        storageData.user,
+        validationConfig,
+      );
+
+      // Show validation errors
+      if (!validation.isValid) {
+        setValidationModal({
+          isOpen: true,
+          validation,
+        });
+        return;
+      }
+
+      // Show warnings but allow upload to proceed
+      if (validation.warnings.length > 0) {
+        validation.warnings.forEach((warning) => {
+          toast(warning, {
+            duration: 4000,
+            icon: "⚠️",
+          });
+        });
+      }
+
+      // Start upload with progress tracking
+      await itemOperations.uploadFiles(processedFiles, parentId, (progress) => {
         setUploadingFiles(progress);
       });
 
@@ -363,6 +483,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       }, 2000);
     } catch (error) {
       console.error("Upload failed:", error);
+
+      // Clear processing progress on error
+      setFileProcessingProgress({
+        isProcessing: false,
+        processedFiles: 0,
+        totalFiles: 0,
+        currentFile: "",
+      });
 
       // Show error message
       const errorMessage =
@@ -892,6 +1020,43 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
               {children}
 
+              {/* File Processing Progress */}
+              {fileProcessingProgress.isProcessing && (
+                <div className="fixed right-4 bottom-4 w-80 rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex-shrink-0">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-green-600"></div>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <p className="font-medium text-gray-900">
+                          Processing folder...
+                        </p>
+                        <span className="text-gray-500">
+                          {fileProcessingProgress.processedFiles} /{" "}
+                          {fileProcessingProgress.totalFiles}
+                        </span>
+                      </div>
+                      <div className="mt-2">
+                        <div className="h-2 w-full rounded-full bg-gray-200">
+                          <div
+                            className="h-2 rounded-full bg-green-500 transition-all duration-300"
+                            style={{
+                              width: `${(fileProcessingProgress.processedFiles / fileProcessingProgress.totalFiles) * 100}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                      {fileProcessingProgress.currentFile && (
+                        <p className="mt-1 truncate text-xs text-gray-500">
+                          {fileProcessingProgress.currentFile}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Upload Progress */}
               {uploadingFiles.length > 0 && (
                 <div className="fixed right-4 bottom-4 w-80 space-y-2">
@@ -1253,6 +1418,126 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 <span>
                   {itemOperations.isCreating ? "Creating..." : "Create Folder"}
                 </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Validation Modal - Inlined */}
+      {validationModal.isOpen && validationModal.validation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-6 w-full max-w-lg rounded-xl bg-white shadow-xl">
+            {/* Modal Header */}
+            <div className="flex h-16 items-center justify-between border-b border-gray-200 px-6">
+              <div className="flex items-center space-x-3">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+                <h2 className="text-base font-medium text-gray-900">
+                  Upload Validation Failed
+                </h2>
+              </div>
+              <button
+                onClick={() =>
+                  setValidationModal({ isOpen: false, validation: null })
+                }
+                className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              <div className="mb-6">
+                <p className="text-sm text-gray-600">
+                  Selected:{" "}
+                  <span className="font-medium text-gray-900">
+                    {validationModal.validation.fileCount} files
+                  </span>{" "}
+                  ({formatFileSize(validationModal.validation.totalSize)})
+                </p>
+              </div>
+
+              {/* Errors */}
+              {validationModal.validation.errors.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="mb-2 text-sm font-medium text-red-800">
+                    Issues Found:
+                  </h3>
+                  <div className="space-y-2">
+                    {validationModal.validation.errors.map((error, index) => (
+                      <div
+                        key={index}
+                        className="flex items-start space-x-2 text-sm text-red-700"
+                      >
+                        <span className="mt-0.5 text-red-500">•</span>
+                        <span>{error}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Oversized Files (only shown if there are any - rare since we removed hard limits) */}
+              {validationModal.validation.oversizedFiles.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="mb-2 text-sm font-medium text-red-800">
+                    Files Exceeding Configured Limits:
+                  </h3>
+                  <div className="max-h-32 overflow-y-auto rounded-md border border-red-200 bg-red-50 p-3">
+                    <div className="space-y-1">
+                      {validationModal.validation.oversizedFiles.map(
+                        (file, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between text-xs text-red-700"
+                          >
+                            <span className="truncate font-medium">
+                              {file.name}
+                            </span>
+                            <span className="ml-2 flex-shrink-0">
+                              {file.formattedSize}
+                            </span>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Warnings */}
+              {validationModal.validation.warnings.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="mb-2 text-sm font-medium text-yellow-800">
+                    Warnings:
+                  </h3>
+                  <div className="space-y-2">
+                    {validationModal.validation.warnings.map(
+                      (warning, index) => (
+                        <div
+                          key={index}
+                          className="flex items-start space-x-2 text-sm text-yellow-700"
+                        >
+                          <span className="mt-0.5 text-yellow-500">•</span>
+                          <span>{warning}</span>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end border-t border-gray-200 px-6 py-3">
+              <button
+                onClick={() =>
+                  setValidationModal({ isOpen: false, validation: null })
+                }
+                className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+              >
+                Close
               </button>
             </div>
           </div>
