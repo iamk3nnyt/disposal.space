@@ -1,7 +1,8 @@
+import { useUploadProgress } from "@/lib/contexts/upload-progress-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import toast from "react-hot-toast";
-import { useItemOperations, type UploadProgress } from "./use-item-operations";
+import { useItemOperations } from "./use-item-operations";
 import {
   getValidationConfig,
   validateFilesBeforeUpload,
@@ -21,7 +22,7 @@ export function useDragDrop(
   }) => void,
 ) {
   const [isDragOver, setIsDragOver] = useState(false);
-  const [uploadingFiles, setUploadingFiles] = useState<UploadProgress[]>([]);
+  const { uploadingFiles, setUploadingFiles } = useUploadProgress();
   const itemOperations = useItemOperations();
   const { data: storageData } = useUserStorage();
   const queryClient = useQueryClient();

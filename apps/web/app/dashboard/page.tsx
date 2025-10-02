@@ -47,24 +47,19 @@ export default function Home() {
   });
 
   const itemOperations = useItemOperations();
-  const {
-    isDragOver,
-    uploadingFiles,
-    handleDragOver,
-    handleDragLeave,
-    handleDrop,
-  } = useDragDrop(
-    undefined,
-    (validation) => {
-      setValidationModal({
-        isOpen: true,
-        validation,
-      });
-    },
-    (progress) => {
-      setFileProcessingProgress(progress);
-    },
-  );
+  const { isDragOver, handleDragOver, handleDragLeave, handleDrop } =
+    useDragDrop(
+      undefined,
+      (validation) => {
+        setValidationModal({
+          isOpen: true,
+          validation,
+        });
+      },
+      (progress) => {
+        setFileProcessingProgress(progress);
+      },
+    );
 
   // Fetch items from API
   const { data: itemsData, isLoading, error } = useItems();
@@ -292,59 +287,6 @@ export default function Home() {
               endIndex={pagination.endIndex}
             />
           </>
-        )}
-
-        {/* Upload Progress */}
-        {uploadingFiles.length > 0 && (
-          <div className="fixed right-4 bottom-4 w-80 space-y-2">
-            {uploadingFiles.map((file) => (
-              <div
-                key={file.fileName + file.size}
-                className="rounded-lg border border-gray-200 bg-white p-4 shadow-lg"
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center space-x-2 truncate">
-                    {!file.isFolder && (
-                      <Upload className="h-4 w-4 shrink-0 text-green-500" />
-                    )}
-                    <span className="truncate text-sm font-medium text-gray-900">
-                      {file.fileName}
-                    </span>
-                  </div>
-                  <span className="text-xs whitespace-nowrap text-gray-500">
-                    {file.size}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <p className="text-xs text-gray-500">
-                      {file.status === "uploading" &&
-                        (file.isFolder
-                          ? "Disposing folder..."
-                          : "Disposing...")}
-                      {file.status === "processing" &&
-                        (file.isFolder
-                          ? "Processing files..."
-                          : "Processing...")}
-                      {file.status === "completed" &&
-                        (file.isFolder ? "Folder disposed!" : "Complete!")}
-                      {file.status === "error" && "Error"}
-                    </p>
-                    <span>{Math.round(file.progress)}%</span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-gray-200">
-                    <div
-                      className="h-2 rounded-full bg-green-500 transition-all duration-300"
-                      style={{ width: `${file.progress}%` }}
-                    />
-                  </div>
-                </div>
-                {file.status === "error" && file.error && (
-                  <p className="mt-1 text-xs text-red-600">{file.error}</p>
-                )}
-              </div>
-            ))}
-          </div>
         )}
 
         {/* Drag Overlay */}

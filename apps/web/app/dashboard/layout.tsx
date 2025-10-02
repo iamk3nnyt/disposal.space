@@ -4,14 +4,14 @@ import {
   SelectionProvider,
   useSelection,
 } from "@/lib/contexts/selection-context";
+import {
+  UploadProgressProvider,
+  useUploadProgress,
+} from "@/lib/contexts/upload-progress-context";
 import { getFileIcon } from "@/lib/file-icons";
 import { useFolderChildren } from "@/lib/hooks/use-folder-children";
 import { useFolderPath } from "@/lib/hooks/use-folder-path";
-import {
-  useItemOperations,
-  useItems,
-  type UploadProgress,
-} from "@/lib/hooks/use-item-operations";
+import { useItemOperations, useItems } from "@/lib/hooks/use-item-operations";
 import { usePagination } from "@/lib/hooks/use-pagination";
 import { useSearch, type SearchResult } from "@/lib/hooks/use-search";
 import {
@@ -393,7 +393,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     folderName: string;
   }>({ isOpen: false, folderId: "", folderName: "" });
   const [renameValue, setRenameValue] = useState("");
-  const [uploadingFiles, setUploadingFiles] = useState<UploadProgress[]>([]);
+  const { uploadingFiles, setUploadingFiles } = useUploadProgress();
   const [isUploadDropdownOpen, setIsUploadDropdownOpen] = useState(false);
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -1743,7 +1743,9 @@ export default function DashboardLayout({
       }
     >
       <SelectionProvider>
-        <DashboardLayoutContent>{children}</DashboardLayoutContent>
+        <UploadProgressProvider>
+          <DashboardLayoutContent>{children}</DashboardLayoutContent>
+        </UploadProgressProvider>
       </SelectionProvider>
     </Suspense>
   );
