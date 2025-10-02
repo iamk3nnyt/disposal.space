@@ -121,6 +121,25 @@ export default function Home() {
                   Download App
                 </Link>
               </div>
+
+              {/* Terms and Privacy Links */}
+              <p className="mt-4 text-sm text-gray-500">
+                By using our service, you agree to our{" "}
+                <Link
+                  href="/terms"
+                  className="text-gray-700 underline hover:text-gray-900"
+                >
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link
+                  href="/privacy"
+                  className="text-gray-700 underline hover:text-gray-900"
+                >
+                  Privacy Policy
+                </Link>
+                .
+              </p>
             </div>
 
             {/* Right Column - Dashboard Preview */}
