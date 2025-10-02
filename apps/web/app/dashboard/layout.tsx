@@ -8,6 +8,10 @@ import {
   UploadProgressProvider,
   useUploadProgress,
 } from "@/lib/contexts/upload-progress-context";
+import {
+  ValidationModalProvider,
+  useValidationModal,
+} from "@/lib/contexts/validation-modal-context";
 import { getFileIcon } from "@/lib/file-icons";
 import { useFolderChildren } from "@/lib/hooks/use-folder-children";
 import { useFolderPath } from "@/lib/hooks/use-folder-path";
@@ -17,7 +21,6 @@ import { useSearch, type SearchResult } from "@/lib/hooks/use-search";
 import {
   getValidationConfig,
   validateFilesBeforeUpload,
-  type ValidationResult,
 } from "@/lib/hooks/use-upload-validation";
 import { useUserStorage } from "@/lib/hooks/use-user-storage";
 import { cn, formatFileSize } from "@/lib/utils";
@@ -397,10 +400,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [isUploadDropdownOpen, setIsUploadDropdownOpen] = useState(false);
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  const [validationModal, setValidationModal] = useState<{
-    isOpen: boolean;
-    validation: ValidationResult | null;
-  }>({ isOpen: false, validation: null });
+  const { validationModal, showValidationModal, hideValidationModal } =
+    useValidationModal();
   const [fileProcessingProgress, setFileProcessingProgress] = useState<{
     isProcessing: boolean;
     processedFiles: number;
@@ -733,10 +734,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
       // Show validation errors
       if (!validation.isValid) {
-        setValidationModal({
-          isOpen: true,
-          validation,
-        });
+        showValidationModal(validation);
         return;
       }
 
@@ -1619,9 +1617,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 </h2>
               </div>
               <button
-                onClick={() =>
-                  setValidationModal({ isOpen: false, validation: null })
-                }
+                onClick={hideValidationModal}
                 className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
               >
                 <X className="h-4 w-4" />
@@ -1714,9 +1710,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             {/* Modal Footer */}
             <div className="flex items-center justify-end border-t border-gray-200 px-6 py-3">
               <button
-                onClick={() =>
-                  setValidationModal({ isOpen: false, validation: null })
-                }
+                onClick={hideValidationModal}
                 className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
               >
                 Close
@@ -1744,7 +1738,9 @@ export default function DashboardLayout({
     >
       <SelectionProvider>
         <UploadProgressProvider>
-          <DashboardLayoutContent>{children}</DashboardLayoutContent>
+          <ValidationModalProvider>
+            <DashboardLayoutContent>{children}</DashboardLayoutContent>
+          </ValidationModalProvider>
         </UploadProgressProvider>
       </SelectionProvider>
     </Suspense>

@@ -1,4 +1,5 @@
 import { useUploadProgress } from "@/lib/contexts/upload-progress-context";
+import { useValidationModal } from "@/lib/contexts/validation-modal-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import toast from "react-hot-toast";
@@ -11,9 +12,6 @@ import { useUserStorage } from "./use-user-storage";
 
 export function useDragDrop(
   parentId?: string,
-  onValidationError?: (
-    validation: ReturnType<typeof validateFilesBeforeUpload>,
-  ) => void,
   onProcessingProgress?: (progress: {
     isProcessing: boolean;
     processedFiles: number;
@@ -23,6 +21,7 @@ export function useDragDrop(
 ) {
   const [isDragOver, setIsDragOver] = useState(false);
   const { uploadingFiles, setUploadingFiles } = useUploadProgress();
+  const { showValidationModal } = useValidationModal();
   const itemOperations = useItemOperations();
   const { data: storageData } = useUserStorage();
   const queryClient = useQueryClient();
@@ -289,14 +288,7 @@ export function useDragDrop(
 
       // Show validation errors
       if (!validation.isValid) {
-        if (onValidationError) {
-          onValidationError(validation);
-        } else {
-          // Fallback to toast notifications if no callback provided
-          validation.errors.forEach((error) => {
-            toast.error(error, { duration: 6000 });
-          });
-        }
+        showValidationModal(validation);
         return;
       }
 
@@ -366,14 +358,7 @@ export function useDragDrop(
 
       // Show validation errors
       if (!validation.isValid) {
-        if (onValidationError) {
-          onValidationError(validation);
-        } else {
-          // Fallback to toast notifications if no callback provided
-          validation.errors.forEach((error) => {
-            toast.error(error, { duration: 6000 });
-          });
-        }
+        showValidationModal(validation);
         return;
       }
 
