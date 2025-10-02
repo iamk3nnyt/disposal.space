@@ -684,7 +684,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
       // Update progress
       updateLayoutProcessingProgress({
-        processedFiles: i + 1,
+        processedFiles: i,
         currentFile: file.name,
       });
 
