@@ -674,36 +674,40 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       isProcessing: true,
       processedFiles: 0,
       totalFiles: fileArray.length,
-      currentFile: "",
+      currentFile: "Processing folder contents...",
     });
 
     const processedFiles: File[] = [];
 
+    // Calculate timing based on file count for better UX
+    const totalFiles = fileArray.length;
+    const baseDelay = Math.min(Math.max(totalFiles * 2, 500), 2000); // 500ms to 2s total
+    const delayPerFile = baseDelay / totalFiles;
+
     for (let i = 0; i < fileArray.length; i++) {
       const file = fileArray[i];
 
-      // Update progress
+      // Update progress with 1-based counting for better UX
       updateLayoutProcessingProgress({
-        processedFiles: i,
+        processedFiles: i + 1,
         currentFile: file.name,
       });
 
-      // Small delay to allow UI to update and prevent blocking
-      if (i % 10 === 0) {
-        await new Promise((resolve) => setTimeout(resolve, 1));
-      }
+      // Proportional delay based on total files for smoother progress
+      await new Promise((resolve) => setTimeout(resolve, delayPerFile));
 
       processedFiles.push(file);
     }
 
-    // Final progress update
+    // Validation phase - show as separate step
     updateLayoutProcessingProgress({
       processedFiles: fileArray.length,
       currentFile: "Validating files...",
     });
 
-    // Small delay before validation
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Validation delay proportional to file count
+    const validationDelay = Math.min(Math.max(totalFiles * 0.5, 200), 800);
+    await new Promise((resolve) => setTimeout(resolve, validationDelay));
 
     return processedFiles;
   };
