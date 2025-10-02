@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  SelectionProvider,
+  useSelection,
+} from "@/lib/contexts/selection-context";
 import { getFileIcon } from "@/lib/file-icons";
 import { useFolderChildren } from "@/lib/hooks/use-folder-children";
 import { useFolderPath } from "@/lib/hooks/use-folder-path";
@@ -23,11 +27,11 @@ import {
   ArrowLeft,
   ChevronDown,
   ChevronRight,
+  Download,
   Edit3,
   File,
   Folder,
   FolderPlus,
-  Home,
   Loader2,
   MoreHorizontal,
   Plus,
@@ -50,6 +54,286 @@ type SidebarItem = {
   isExpanded?: boolean;
   children?: { id: string; name: string; type: string }[];
 };
+
+// Header Title Component (Left side - Dashboard title or selection info)
+function HeaderTitle() {
+  const { selectedFiles, clearSelection } = useSelection();
+  const pathname = usePathname();
+
+  // Get current folder path segments for dynamic content
+  const getCurrentFolderPath = () => {
+    if (pathname === "/dashboard") {
+      return [];
+    }
+
+    const pathSegments = pathname.split("/").filter(Boolean);
+    if (pathSegments.length > 1 && pathSegments[0] === "dashboard") {
+      return pathSegments
+        .slice(1)
+        .map((segment) => decodeURIComponent(segment));
+    }
+
+    return [];
+  };
+
+  const currentFolderPath = getCurrentFolderPath();
+
+  if (selectedFiles.length > 0) {
+    // Show selection info when files are selected
+    return (
+      <div className="-ml-1.5 flex items-center space-x-3">
+        <button
+          onClick={clearSelection}
+          className="flex items-center justify-center rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          title="Clear selection"
+        >
+          <X className="size-4.5" />
+        </button>
+        <span className="text-base font-medium text-gray-900">
+          {selectedFiles.length === 1
+            ? "1 item"
+            : `${selectedFiles.length} items`}{" "}
+          selected
+        </span>
+      </div>
+    );
+  }
+
+  // Show normal title when no files are selected
+  if (currentFolderPath.length > 0) {
+    return (
+      <nav className="flex items-center space-x-2 text-sm">
+        <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">
+          Dashboard
+        </Link>
+        {currentFolderPath.map((segment, index) => {
+          const isLast = index === currentFolderPath.length - 1;
+          const path = `/dashboard/${currentFolderPath
+            .slice(0, index + 1)
+            .map(encodeURIComponent)
+            .join("/")}`;
+
+          return (
+            <div key={index} className="flex items-center space-x-2">
+              <span className="text-gray-400">/</span>
+              {isLast ? (
+                <span className="font-medium text-gray-900">
+                  {decodeURIComponent(segment)}
+                </span>
+              ) : (
+                <Link href={path} className="text-gray-600 hover:text-gray-900">
+                  {decodeURIComponent(segment)}
+                </Link>
+              )}
+            </div>
+          );
+        })}
+      </nav>
+    );
+  }
+
+  return <h2 className="text-base font-medium text-gray-900">Dashboard</h2>;
+}
+
+// Header Actions Component (Right side - Settings/Upload or Download/Delete)
+function HeaderActions() {
+  const { selectedFiles, clearSelection } = useSelection();
+  const itemOperations = useItemOperations();
+  const [isHeaderUploadDropdownOpen, setIsHeaderUploadDropdownOpen] =
+    useState(false);
+  const pathname = usePathname();
+
+  // Get current folder path segments for dynamic content
+  const getCurrentFolderPath = () => {
+    if (pathname === "/dashboard") {
+      return [];
+    }
+
+    const pathSegments = pathname.split("/").filter(Boolean);
+    if (pathSegments.length > 1 && pathSegments[0] === "dashboard") {
+      return pathSegments
+        .slice(1)
+        .map((segment) => decodeURIComponent(segment));
+    }
+
+    return [];
+  };
+
+  const currentFolderPath = getCurrentFolderPath();
+
+  // Get folder data for current path (if in a folder)
+  const { data: folderData } = useFolderPath(currentFolderPath);
+
+  // Get items for current folder (root if no folder, or specific folder if in one)
+  const { data: itemsData } = useItems(
+    currentFolderPath.length === 0 ? null : folderData?.folderId,
+  );
+
+  const allFiles = itemsData?.items || [];
+
+  // Get paginated files (assuming 10 items per page like in the pages)
+  const pagination = usePagination({
+    itemsPerPage: 10,
+    totalItems: allFiles.length,
+  });
+  const files = pagination.getPageItems(allFiles);
+
+  // File upload handlers (moved from main component)
+  const triggerFileUpload = (isFolder: boolean) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    if (isFolder) {
+      input.webkitdirectory = true;
+    }
+
+    input.onchange = async (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.files && target.files.length > 0) {
+        const fileArray = Array.from(target.files);
+        // Handle file upload logic here
+        console.log("Files selected:", fileArray);
+      }
+    };
+
+    input.click();
+  };
+
+  const handleCreateFolderClick = () => {
+    // This would need to be connected to the modal state
+    console.log("Create folder clicked");
+  };
+
+  if (selectedFiles.length > 0) {
+    // Show bulk actions when files are selected
+    return (
+      <div className="flex items-center space-x-2">
+        <button
+          onClick={() => {
+            const selectedItems = files
+              .filter((file) => selectedFiles.includes(file.id))
+              .map((file) => ({
+                id: file.id,
+                name: file.name,
+                isFolder: file.isFolder,
+              }));
+
+            const downloadPromise = itemOperations.bulkDownload(selectedItems);
+            toast.promise(downloadPromise, {
+              loading: `Downloading ${selectedFiles.length} items...`,
+              success: (result) => {
+                let message = `Successfully downloaded ${result.success} items`;
+                if (result.skipped > 0) {
+                  message += ` (${result.skipped} folders skipped)`;
+                }
+                if (result.failed > 0) {
+                  message += ` (${result.failed} failed)`;
+                }
+                return message;
+              },
+              error: (err) =>
+                `Download failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+            });
+          }}
+          disabled={itemOperations.isBulkDownloading}
+          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
+        >
+          <Download className="mr-2 h-4 w-4" />
+          Download
+        </button>
+        <button
+          onClick={() => {
+            const deletePromise = itemOperations.bulkDelete(selectedFiles);
+            toast.promise(deletePromise, {
+              loading: `Deleting ${selectedFiles.length} items...`,
+              success: (result) => {
+                clearSelection(); // Clear selection after successful delete
+                let message = `Successfully deleted ${result.success} items`;
+                if (result.failed > 0) {
+                  message += ` (${result.failed} failed)`;
+                }
+                return message;
+              },
+              error: (err) =>
+                `Delete failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+            });
+          }}
+          disabled={itemOperations.isBulkDeleting}
+          className="inline-flex items-center rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Delete
+        </button>
+      </div>
+    );
+  }
+
+  // Show normal header actions when no files are selected
+  return (
+    <div className="flex items-center space-x-3">
+      <Link
+        href="/dashboard/settings"
+        className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+      >
+        Settings
+      </Link>
+      {/* Header Upload Dropdown */}
+      <div className="upload-dropdown relative">
+        <button
+          onClick={() =>
+            setIsHeaderUploadDropdownOpen(!isHeaderUploadDropdownOpen)
+          }
+          className="flex items-center space-x-1 rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-800"
+        >
+          <span>Upload</span>
+          <ChevronDown
+            className={cn(
+              "h-3 w-3 transition-transform",
+              isHeaderUploadDropdownOpen && "rotate-180",
+            )}
+          />
+        </button>
+
+        {/* Header Dropdown Menu */}
+        {isHeaderUploadDropdownOpen && (
+          <div className="absolute top-full right-0 z-10 mt-1 w-40 rounded-md border border-gray-200 bg-white shadow-lg">
+            <button
+              onClick={() => {
+                triggerFileUpload(false);
+                setIsHeaderUploadDropdownOpen(false);
+              }}
+              className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              <File className="h-4 w-4" />
+              <span>Upload Files</span>
+            </button>
+            <button
+              onClick={() => {
+                triggerFileUpload(true);
+                setIsHeaderUploadDropdownOpen(false);
+              }}
+              className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              <FolderPlus className="h-4 w-4" />
+              <span>Upload Folder</span>
+            </button>
+            <hr className="my-1 border-gray-100" />
+            <button
+              onClick={() => {
+                handleCreateFolderClick();
+                setIsHeaderUploadDropdownOpen(false);
+              }}
+              className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              <Folder className="h-4 w-4" />
+              <span>Create Folder</span>
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -914,119 +1198,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 </div>
               ) : (
                 <div className="flex h-16 min-h-16 w-full items-center justify-between border-b border-gray-200 px-6">
-                  <div className="flex items-center">
-                    {pathname.startsWith("/dashboard/") &&
-                    pathname !== "/dashboard" ? (
-                      // Show breadcrumbs for nested folder paths
-                      <nav className="flex items-center space-x-2 text-sm">
-                        <Home className="h-4 w-4 text-gray-400" />
-                        <Link
-                          href="/dashboard"
-                          className="text-gray-600 hover:text-gray-900"
-                        >
-                          Dashboard
-                        </Link>
-                        {pathname
-                          .replace("/dashboard", "")
-                          .split("/")
-                          .filter(Boolean)
-                          .map((segment, index, segments) => {
-                            const decodedSegment = decodeURIComponent(segment);
-                            const isLast = index === segments.length - 1;
-                            const path = `/dashboard/${segments
-                              .slice(0, index + 1)
-                              .map(encodeURIComponent)
-                              .join("/")}`;
-
-                            return (
-                              <div key={path} className="flex items-center">
-                                <span className="mx-2 text-gray-400">/</span>
-                                {isLast ? (
-                                  <span className="font-medium text-gray-900">
-                                    {decodedSegment}
-                                  </span>
-                                ) : (
-                                  <Link
-                                    href={path}
-                                    className="text-gray-600 hover:text-gray-900"
-                                  >
-                                    {decodedSegment}
-                                  </Link>
-                                )}
-                              </div>
-                            );
-                          })}
-                      </nav>
-                    ) : (
-                      <h2 className="text-base font-medium text-gray-900">
-                        Dashboard
-                      </h2>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <Link
-                      href="/dashboard/settings"
-                      className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      Settings
-                    </Link>
-                    {/* Header Upload Dropdown */}
-                    <div className="upload-dropdown relative">
-                      <button
-                        onClick={() =>
-                          setIsHeaderUploadDropdownOpen(
-                            !isHeaderUploadDropdownOpen,
-                          )
-                        }
-                        className="flex items-center space-x-1 rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-800"
-                      >
-                        <span>Upload</span>
-                        <ChevronDown
-                          className={cn(
-                            "h-3 w-3 transition-transform",
-                            isHeaderUploadDropdownOpen && "rotate-180",
-                          )}
-                        />
-                      </button>
-
-                      {/* Header Dropdown Menu */}
-                      {isHeaderUploadDropdownOpen && (
-                        <div className="absolute top-full right-0 z-10 mt-1 w-40 rounded-md border border-gray-200 bg-white shadow-lg">
-                          <button
-                            onClick={() => {
-                              triggerFileUpload(false);
-                              setIsHeaderUploadDropdownOpen(false);
-                            }}
-                            className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            <File className="h-4 w-4" />
-                            <span>Upload Files</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              triggerFileUpload(true);
-                              setIsHeaderUploadDropdownOpen(false);
-                            }}
-                            className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            <FolderPlus className="h-4 w-4" />
-                            <span>Upload Folder</span>
-                          </button>
-                          <hr className="my-1 border-gray-100" />
-                          <button
-                            onClick={() => {
-                              handleCreateFolderClick();
-                              setIsHeaderUploadDropdownOpen(false);
-                            }}
-                            className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            <Folder className="h-4 w-4" />
-                            <span>Create Folder</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <HeaderTitle />
+                  <HeaderActions />
                 </div>
               )}
 
@@ -1572,7 +1745,9 @@ export default function DashboardLayout({
         </div>
       }
     >
-      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+      <SelectionProvider>
+        <DashboardLayoutContent>{children}</DashboardLayoutContent>
+      </SelectionProvider>
     </Suspense>
   );
 }

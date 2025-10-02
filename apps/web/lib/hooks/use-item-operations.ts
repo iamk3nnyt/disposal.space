@@ -145,6 +145,77 @@ async function deleteItem(itemId: string): Promise<ItemDeleteResponse> {
   return response.json();
 }
 
+// Bulk delete multiple items
+async function bulkDeleteItems(itemIds: string[]): Promise<{
+  success: number;
+  failed: number;
+  errors: Array<{ itemId: string; error: string }>;
+}> {
+  const results = {
+    success: 0,
+    failed: 0,
+    errors: [] as Array<{ itemId: string; error: string }>,
+  };
+
+  // Process deletions in parallel for better performance
+  const deletePromises = itemIds.map(async (itemId) => {
+    try {
+      await deleteItem(itemId);
+      results.success++;
+    } catch (error) {
+      results.failed++;
+      results.errors.push({
+        itemId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  await Promise.allSettled(deletePromises);
+  return results;
+}
+
+// Bulk download multiple items (files only)
+async function bulkDownloadItems(
+  items: Array<{ id: string; name: string; isFolder: boolean }>,
+): Promise<{
+  success: number;
+  failed: number;
+  skipped: number;
+  errors: Array<{ itemId: string; error: string }>;
+}> {
+  const results = {
+    success: 0,
+    failed: 0,
+    skipped: 0,
+    errors: [] as Array<{ itemId: string; error: string }>,
+  };
+
+  // Filter out folders (can't download folders individually)
+  const downloadableItems = items.filter((item) => !item.isFolder);
+  const skippedFolders = items.filter((item) => item.isFolder);
+
+  results.skipped = skippedFolders.length;
+
+  // Process downloads in parallel
+  const downloadPromises = downloadableItems.map(async (item) => {
+    try {
+      const blob = await downloadItem(item.id, { download: true });
+      triggerDownload(blob, item.name);
+      results.success++;
+    } catch (error) {
+      results.failed++;
+      results.errors.push({
+        itemId: item.id,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  await Promise.allSettled(downloadPromises);
+  return results;
+}
+
 // Utility function to trigger browser download
 function triggerDownload(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
@@ -834,6 +905,52 @@ export function useItemCreate() {
   });
 }
 
+// Hook for bulk delete operations
+export function useBulkDelete() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    {
+      success: number;
+      failed: number;
+      errors: Array<{ itemId: string; error: string }>;
+    },
+    Error,
+    string[]
+  >({
+    mutationFn: (itemIds) => bulkDeleteItems(itemIds),
+    onSuccess: () => {
+      // Invalidate all relevant queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["folderChildren"] });
+      queryClient.invalidateQueries({ queryKey: ["search"] });
+      queryClient.invalidateQueries({ queryKey: ["user", "storage"] });
+    },
+    onError: (error) => {
+      console.error("Bulk delete failed:", error);
+    },
+  });
+}
+
+// Hook for bulk download operations
+export function useBulkDownload() {
+  return useMutation<
+    {
+      success: number;
+      failed: number;
+      skipped: number;
+      errors: Array<{ itemId: string; error: string }>;
+    },
+    Error,
+    Array<{ id: string; name: string; isFolder: boolean }>
+  >({
+    mutationFn: (items) => bulkDownloadItems(items),
+    onError: (error) => {
+      console.error("Bulk download failed:", error);
+    },
+  });
+}
+
 // Unified hook for all item operations
 export function useItemOperations() {
   const downloadMutation = useItemDownload();
@@ -841,6 +958,8 @@ export function useItemOperations() {
   const uploadMutation = useItemUpload();
   const createMutation = useItemCreate();
   const updateMutation = useItemUpdate();
+  const bulkDeleteMutation = useBulkDelete();
+  const bulkDownloadMutation = useBulkDownload();
 
   return {
     // Query functions (for data fetching) - use the hook directly
@@ -893,12 +1012,26 @@ export function useItemOperations() {
       });
     },
 
+    // Bulk delete multiple items
+    bulkDelete: (itemIds: string[]) => {
+      return bulkDeleteMutation.mutateAsync(itemIds);
+    },
+
+    // Bulk download multiple items (files only)
+    bulkDownload: (
+      items: Array<{ id: string; name: string; isFolder: boolean }>,
+    ) => {
+      return bulkDownloadMutation.mutateAsync(items);
+    },
+
     // Loading states
     isDownloading: downloadMutation.isPending,
     isDeleting: deleteMutation.isPending,
     isUploading: uploadMutation.isPending,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
+    isBulkDeleting: bulkDeleteMutation.isPending,
+    isBulkDownloading: bulkDownloadMutation.isPending,
 
     // Error states
     downloadError: downloadMutation.error,
@@ -906,6 +1039,8 @@ export function useItemOperations() {
     uploadError: uploadMutation.error,
     createError: createMutation.error,
     updateError: updateMutation.error,
+    bulkDeleteError: bulkDeleteMutation.error,
+    bulkDownloadError: bulkDownloadMutation.error,
 
     // Direct access to mutations for advanced usage
     mutations: {
@@ -914,6 +1049,8 @@ export function useItemOperations() {
       update: updateMutation,
       download: downloadMutation,
       delete: deleteMutation,
+      bulkDelete: bulkDeleteMutation,
+      bulkDownload: bulkDownloadMutation,
     },
   };
 }

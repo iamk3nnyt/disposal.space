@@ -1,6 +1,7 @@
 "use client";
 
 import { Pagination } from "@/components/pagination";
+import { useSelection } from "@/lib/contexts/selection-context";
 import { getFileIcon } from "@/lib/file-icons";
 import { useDragDrop } from "@/lib/hooks/use-drag-drop";
 import { useFolderPath } from "@/lib/hooks/use-folder-path";
@@ -31,7 +32,13 @@ interface FolderNavigationPageProps {
 export default function FolderNavigationPage({
   params,
 }: FolderNavigationPageProps) {
-  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+  const {
+    selectedFiles,
+    toggleFileSelection,
+    toggleSelectAll,
+    isAllSelected,
+    isIndeterminate,
+  } = useSelection();
   const [validationModal, setValidationModal] = useState<{
     isOpen: boolean;
     validation: ValidationResult | null;
@@ -89,14 +96,6 @@ export default function FolderNavigationPage({
 
   const isLoading = isLoadingPath || isLoadingItems;
 
-  const toggleFileSelection = (fileId: string) => {
-    setSelectedFiles((prev) =>
-      prev.includes(fileId)
-        ? prev.filter((id) => id !== fileId)
-        : [...prev, fileId],
-    );
-  };
-
   const allFiles = itemsData?.items || [];
 
   // Pagination
@@ -106,19 +105,7 @@ export default function FolderNavigationPage({
   });
 
   const files = pagination.getPageItems(allFiles);
-
-  const toggleSelectAll = () => {
-    if (selectedFiles.length === files.length) {
-      setSelectedFiles([]);
-    } else {
-      setSelectedFiles(files.map((file) => file.id));
-    }
-  };
-
-  const isAllSelected =
-    selectedFiles.length === files.length && files.length > 0;
-  const isIndeterminate =
-    selectedFiles.length > 0 && selectedFiles.length < files.length;
+  const fileIds = files.map((file) => file.id);
 
   // Error state for invalid paths
   if (pathError) {
@@ -207,11 +194,11 @@ export default function FolderNavigationPage({
                     <th className="w-12 pb-3 pl-3 font-medium">
                       <input
                         type="checkbox"
-                        checked={isAllSelected}
+                        checked={isAllSelected(fileIds)}
                         ref={(el) => {
-                          if (el) el.indeterminate = isIndeterminate;
+                          if (el) el.indeterminate = isIndeterminate(fileIds);
                         }}
-                        onChange={toggleSelectAll}
+                        onChange={() => toggleSelectAll(fileIds)}
                         className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                       />
                     </th>
