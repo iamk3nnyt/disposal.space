@@ -1012,6 +1012,17 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                             <FolderPlus className="h-4 w-4" />
                             <span>Upload Folder</span>
                           </button>
+                          <hr className="my-1 border-gray-100" />
+                          <button
+                            onClick={() => {
+                              handleCreateFolderClick();
+                              setIsHeaderUploadDropdownOpen(false);
+                            }}
+                            className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          >
+                            <Folder className="h-4 w-4" />
+                            <span>Create Folder</span>
+                          </button>
                         </div>
                       )}
                     </div>
