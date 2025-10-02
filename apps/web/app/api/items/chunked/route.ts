@@ -1,4 +1,5 @@
 import { chunkTracker } from "@/lib/chunk-tracker";
+import { createFolderHierarchy } from "@/lib/folder-traversal";
 import { formatFileSize } from "@/lib/utils";
 import { auth } from "@clerk/nextjs/server";
 import { fileProcessor } from "@ketryon/aws";
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { fileName, fileSize } = body;
+    const { fileName, relativePath, fileSize, parentId } = body;
 
     // Validate required fields
     if (!fileName || typeof fileName !== "string") {
@@ -51,6 +52,42 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    // Helper function to create folder hierarchy (same logic as SSE system)
+    const createFolderHierarchyFromPath = async (
+      relativePath: string,
+      userId: string,
+      rootParentId: string | null,
+    ): Promise<string | null> => {
+      const pathParts = relativePath
+        .split("/")
+        .filter((part) => part.length > 0);
+
+      // If no path parts, return the root parent
+      if (pathParts.length === 0) return rootParentId;
+
+      // Remove the filename (last part) to get folder path
+      const folderParts = pathParts.slice(0, -1);
+
+      if (folderParts.length === 0) {
+        return rootParentId;
+      }
+
+      // Use unified folder hierarchy creator
+      const result = await createFolderHierarchy(
+        folderParts,
+        userId,
+        rootParentId,
+      );
+      return result.folderId;
+    };
+
+    // Create folder hierarchy if needed (same logic as SSE system)
+    const fileParentId = await createFolderHierarchyFromPath(
+      relativePath || fileName,
+      user.id,
+      parentId || null,
+    );
 
     // Check user storage limits (consistent with client-side validation)
     const totalUsedStorage = user.storageUsed || 0;
@@ -77,6 +114,9 @@ export async function POST(request: NextRequest) {
       fileName,
       clerkUserId,
     );
+
+    // Store the calculated parent ID in chunk tracker for completion
+    chunkTracker.initializeUpload(uploadId, fileParentId);
 
     // Schedule automatic cleanup (30 minutes timeout)
     chunkTracker.scheduleCleanup(uploadId);

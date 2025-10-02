@@ -286,7 +286,6 @@ export function useItemPreviewUrl(itemId: string, enabled = true) {
 }
 
 // Types for upload response
-
 interface UploadResponse {
   success: boolean;
 }
@@ -332,8 +331,9 @@ async function updateItem(
 }
 
 // Constants for chunked uploads
-const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks (S3 minimum)
-const CHUNKED_UPLOAD_THRESHOLD = 100 * 1024 * 1024; // 100MB threshold
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks (S3 minimum for multipart)
+const SMALL_FILE_THRESHOLD = 5 * 1024 * 1024; // 5MB - files smaller than this use single chunk
+// Note: All files now use chunked uploads regardless of size for consistency
 
 // Upload a single file using chunked upload
 async function uploadFileInChunks(
@@ -343,7 +343,18 @@ async function uploadFileInChunks(
 ): Promise<UploadResponse> {
   const fileName = file.name;
   const fileSize = file.size;
-  const totalChunks = Math.ceil(fileSize / CHUNK_SIZE);
+
+  // Extract relative path for folder structure (same as SSE system)
+  const relativePath =
+    (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
+    file.name;
+
+  // Optimize chunk size for small files - use single chunk if file is smaller than 5MB
+  // This makes small files upload as efficiently as the old SSE method (1 request)
+  // while maintaining the unified chunked architecture for all files
+  const effectiveChunkSize =
+    fileSize <= SMALL_FILE_THRESHOLD ? fileSize : CHUNK_SIZE;
+  const totalChunks = Math.ceil(fileSize / effectiveChunkSize);
 
   // Initialize progress
   const initialProgress: UploadProgress[] = [
@@ -359,12 +370,13 @@ async function uploadFileInChunks(
   onProgress?.(initialProgress);
 
   try {
-    // Step 1: Initialize chunked upload
+    // Step 1: Initialize chunked upload (server will handle folder hierarchy)
     const initResponse = await fetch("/api/items/chunked", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fileName,
+        relativePath, // Send relative path to server for folder creation
         fileSize,
         parentId,
       }),
@@ -379,8 +391,8 @@ async function uploadFileInChunks(
 
     // Step 2: Upload chunks
     for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-      const start = chunkIndex * CHUNK_SIZE;
-      const end = Math.min(start + CHUNK_SIZE, fileSize);
+      const start = chunkIndex * effectiveChunkSize;
+      const end = Math.min(start + effectiveChunkSize, fileSize);
       const chunk = file.slice(start, end);
 
       const formData = new FormData();
@@ -471,228 +483,178 @@ async function uploadFileInChunks(
   }
 }
 
-// Upload files with unified SSE progress tracking (now with chunked support)
+// Upload files with unified chunked progress tracking (all files use chunking)
 async function uploadFilesWithProgress(
   files: File[],
   parentId?: string,
   onProgress?: (progress: UploadProgress[]) => void,
 ): Promise<UploadResponse> {
-  // Route files based on size: large files use chunked upload, small files use existing SSE
-  const largeFiles = files.filter(
-    (file) => file.size >= CHUNKED_UPLOAD_THRESHOLD,
-  );
-  const smallFiles = files.filter(
-    (file) => file.size < CHUNKED_UPLOAD_THRESHOLD,
-  );
-
-  // Handle large files with chunked upload (one at a time for now)
-  if (largeFiles.length > 0) {
-    for (const file of largeFiles) {
-      await uploadFileInChunks(file, parentId, onProgress);
-    }
-  }
-
-  // Handle small files with existing SSE streaming (if any)
-  if (smallFiles.length === 0) {
+  if (files.length === 0) {
     return { success: true };
   }
 
-  // Continue with existing SSE logic for small files
-  // Note: Storage limit validation is handled by the backend
-
-  const formData = new FormData();
-
-  // Add small files to form data with path information
-  smallFiles.forEach((file) => {
-    formData.append("files", file);
-
-    // Add the webkitRelativePath separately if it exists
-    const relativePath = (file as File & { webkitRelativePath?: string })
-      .webkitRelativePath;
-    if (relativePath) {
-      formData.append(`filePaths`, relativePath);
-    } else {
-      formData.append(`filePaths`, file.name);
-    }
-  });
-
-  if (parentId) {
-    formData.append("parentId", parentId);
-  }
-
-  // Helper function to detect folder uploads and extract folder name
-  const detectFolderUpload = (files: File[]) => {
-    const filesWithPaths = files.filter((file) => {
-      const relativePath = (file as File & { webkitRelativePath?: string })
-        .webkitRelativePath;
-      return relativePath && relativePath.includes("/");
-    });
-
-    if (filesWithPaths.length === 0) return null;
-
-    // Extract root folder name from the first file's path
-    const firstPath = (
-      filesWithPaths[0] as File & { webkitRelativePath?: string }
-    ).webkitRelativePath;
-    if (!firstPath) return null;
-
-    const rootFolder = firstPath.split("/")[0];
-    return rootFolder;
-  };
-
-  // Initialize progress tracking with hybrid approach
-  const folderName = detectFolderUpload(smallFiles);
+  // Detect if this is a folder upload
+  const folderName = detectFolderUpload(files);
   const isFromFolder = folderName !== null;
 
-  const initialProgress: UploadProgress[] = isFromFolder
-    ? [
-        {
-          fileName: `📁 ${folderName}`,
-          progress: 0,
-          size: `0 of ${smallFiles.length} files`,
-          status: "uploading" as const,
-          isFolder: true,
-          fileCount: {
-            total: smallFiles.length,
-            processed: 0,
-          },
-        },
-      ]
-    : smallFiles.map((file) => ({
-        fileName: file.name,
-        progress: 0,
-        size: formatFileSize(file.size),
-        status: "uploading" as const,
-        isFolder: false,
-      }));
+  // Calculate total size for accurate progress tracking
+  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
 
-  try {
-    // Use unified streaming endpoint
-    const response = await fetch("/api/items?stream=true", {
-      method: "POST",
-      body: formData,
+  // Track progress for all files (for stacked individual file progress)
+  const fileProgressMap = new Map<
+    number,
+    {
+      progress: number;
+      status: "uploading" | "processing" | "completed" | "error";
+    }
+  >();
+
+  // Initialize all files with 0% progress
+  files.forEach((_, index) => {
+    fileProgressMap.set(index, { progress: 0, status: "uploading" });
+  });
+
+  // Progress update function that handles all three cases
+  const updateProgress = (
+    currentFileIndex: number,
+    currentFileProgress: number,
+    currentFileName: string,
+    status: "uploading" | "processing" | "completed" | "error" = "uploading",
+  ) => {
+    // Update current file progress in the map
+    fileProgressMap.set(currentFileIndex, {
+      progress: currentFileProgress,
+      status,
     });
 
-    if (!response.ok) {
-      throw new Error(`Upload failed with status ${response.status}`);
+    if (isFromFolder) {
+      // Case 1: Folder uploads - show single folder progress bar
+      const completedFiles = files.slice(0, currentFileIndex);
+      const completedSize = completedFiles.reduce(
+        (sum, file) => sum + file.size,
+        0,
+      );
+      const currentFile = files[currentFileIndex];
+      const currentFileCompletedSize = currentFile
+        ? (currentFile.size * currentFileProgress) / 100
+        : 0;
+      const totalCompletedSize = completedSize + currentFileCompletedSize;
+      const overallProgress =
+        totalSize > 0
+          ? Math.min(100, (totalCompletedSize / totalSize) * 100)
+          : 0;
+
+      const progressUpdate: UploadProgress[] = [
+        {
+          fileName: `📁 ${folderName}`,
+          progress: overallProgress,
+          size: `${Math.min(currentFileIndex + 1, files.length)} of ${files.length} files`,
+          status,
+          isFolder: true,
+          fileCount: {
+            total: files.length,
+            processed: currentFileIndex + (currentFileProgress >= 100 ? 1 : 0),
+          },
+        },
+      ];
+
+      onProgress?.(progressUpdate);
+    } else {
+      // Case 2: Multiple individual files - show stacked progress for each file
+      const progressUpdate: UploadProgress[] = files.map((file, index) => {
+        const fileProgress = fileProgressMap.get(index) || {
+          progress: 0,
+          status: "uploading" as const,
+        };
+        return {
+          fileName: file.name,
+          progress: fileProgress.progress,
+          size: formatFileSize(file.size),
+          status: fileProgress.status,
+          isFolder: false,
+        };
+      });
+
+      onProgress?.(progressUpdate);
     }
+  };
 
-    if (!response.body) {
-      throw new Error("No response stream available");
-    }
+  if (isFromFolder) {
+    // For folder uploads: Sequential upload to maintain folder integrity
+    for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
+      const file = files[fileIndex];
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-
-      // Keep the last incomplete line in buffer
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          try {
-            const eventData = JSON.parse(line.slice(6));
-
-            if (eventData.category === "upload") {
-              if (eventData.type === "progress") {
-                // Update progress based on server-side events with hybrid approach
-                const updatedProgress = initialProgress.map((item) => {
-                  // Ensure monotonic progress - never go backwards
-                  const newProgress = Math.max(
-                    item.progress || 0,
-                    eventData.data.progress || 0,
-                  );
-
-                  const baseUpdate = {
-                    ...item,
-                    progress: newProgress,
-                    status:
-                      eventData.data.phase === "completed"
-                        ? ("completed" as const)
-                        : eventData.data.phase === "uploading"
-                          ? ("uploading" as const)
-                          : ("processing" as const),
-                  };
-
-                  // Update folder progress with file count
-                  if (
-                    item.isFolder &&
-                    eventData.data.processedFiles !== undefined
-                  ) {
-                    return {
-                      ...baseUpdate,
-                      size: `${eventData.data.processedFiles} of ${eventData.data.totalFiles} files`,
-                      fileCount: {
-                        total: eventData.data.totalFiles,
-                        processed: eventData.data.processedFiles,
-                      },
-                    };
-                  }
-
-                  return baseUpdate;
-                });
-
-                // Update the initialProgress reference for next iteration
-                initialProgress.splice(
-                  0,
-                  initialProgress.length,
-                  ...updatedProgress,
-                );
-                onProgress?.(updatedProgress);
-              } else if (eventData.type === "completed") {
-                // Mark all as completed with final counts
-                const completedProgress = initialProgress.map((item) => ({
-                  ...item,
-                  progress: 100,
-                  status: "completed" as const,
-                  size: item.isFolder
-                    ? `${item.fileCount?.total || files.length} files completed`
-                    : item.size,
-                }));
-
-                onProgress?.(completedProgress);
-              } else if (eventData.type === "error") {
-                // Mark as error
-                const errorProgress = initialProgress.map((item) => ({
-                  ...item,
-                  status: "error" as const,
-                  error: eventData.data.message || "Upload failed",
-                }));
-
-                onProgress?.(errorProgress);
-                throw new Error(eventData.data.message || "Upload failed");
-              }
-            }
-          } catch (parseError) {
-            console.error("Failed to parse SSE event:", parseError);
-          }
-        }
+      try {
+        await uploadFileInChunks(file, parentId, (fileProgress) => {
+          // Update progress for current file
+          const currentFileProgressValue = fileProgress[0]?.progress || 0;
+          const currentStatus = fileProgress[0]?.status || "uploading";
+          updateProgress(
+            fileIndex,
+            currentFileProgressValue,
+            file.name,
+            currentStatus,
+          );
+        });
+      } catch (error) {
+        // Handle individual file upload errors
+        updateProgress(fileIndex, 0, file.name, "error");
+        throw error;
       }
     }
+  } else {
+    // For multiple individual files: Parallel upload for better performance
+    const uploadPromises = files.map((file, fileIndex) => {
+      return uploadFileInChunks(file, parentId, (fileProgress) => {
+        // Update progress for current file
+        const currentFileProgressValue = fileProgress[0]?.progress || 0;
+        const currentStatus = fileProgress[0]?.status || "uploading";
+        updateProgress(
+          fileIndex,
+          currentFileProgressValue,
+          file.name,
+          currentStatus,
+        );
+      }).catch((error) => {
+        // Handle individual file upload errors
+        updateProgress(fileIndex, 0, file.name, "error");
+        throw error;
+      });
+    });
 
-    // Return simplified success response
-    return { success: true };
-  } catch (error) {
-    // Mark as error
-    const errorProgress = initialProgress.map((item) => ({
-      ...item,
-      status: "error" as const,
-      error: error instanceof Error ? error.message : "Upload failed",
-    }));
-
-    onProgress?.(errorProgress);
-    throw error;
+    // Wait for all uploads to complete in parallel
+    await Promise.all(uploadPromises);
   }
+
+  // Final completion update
+  if (isFromFolder) {
+    // For folders, update the overall status
+    const lastFileIndex = files.length - 1;
+    updateProgress(lastFileIndex, 100, "", "completed");
+  }
+
+  return { success: true };
 }
 
-// Note: uploadFiles function removed - use uploadFilesWithProgress directly
+// Helper function to detect folder uploads and extract folder name
+function detectFolderUpload(files: File[]): string | null {
+  const filesWithPaths = files.filter((file) => {
+    const relativePath = (file as File & { webkitRelativePath?: string })
+      .webkitRelativePath;
+    return relativePath && relativePath.includes("/");
+  });
+
+  if (filesWithPaths.length === 0) return null;
+
+  // Extract root folder name from the first file's path
+  const firstPath = (
+    filesWithPaths[0] as File & { webkitRelativePath?: string }
+  ).webkitRelativePath;
+  if (!firstPath) return null;
+
+  const rootFolder = firstPath.split("/")[0];
+  return rootFolder;
+}
 
 // Utility function to format file size
 function formatFileSize(bytes: number): string {

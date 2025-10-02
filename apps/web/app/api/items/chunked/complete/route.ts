@@ -39,15 +39,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const {
-      uploadId,
-      s3Key,
-      fileName,
-      fileSize,
-      totalChunks,
-      parentId,
-      mimeType,
-    } = body;
+    const { uploadId, s3Key, fileName, fileSize, totalChunks, mimeType } = body;
 
     // Validate required fields
     if (!uploadId || typeof uploadId !== "string") {
@@ -116,6 +108,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get the calculated parent ID from initialization (for folder hierarchy)
+    const calculatedParentId = chunkTracker.getParentId(uploadId);
+
     // Complete the S3 multipart upload
     const s3Result = await completeChunkedUpload(uploadId, s3Key, parts);
 
@@ -128,7 +123,7 @@ export async function POST(request: NextRequest) {
       .insert(items)
       .values({
         userId: user.id,
-        parentId: parentId || null,
+        parentId: calculatedParentId, // Use folder-specific parent from initialization
         name: fileName,
         type: "file",
         fileType: fileExtension,

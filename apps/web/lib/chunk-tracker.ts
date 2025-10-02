@@ -33,6 +33,20 @@ class ChunkTracker {
   // uploadId → creation timestamp (for cleanup)
   private timestamps = new Map<string, Date>();
 
+  // uploadId → calculated parent folder ID (for folder hierarchy)
+  private parentIds = new Map<string, string | null>();
+
+  /**
+   * Initialize upload session with parent ID
+   */
+  initializeUpload(uploadId: string, parentId: string | null): void {
+    if (!this.chunks.has(uploadId)) {
+      this.chunks.set(uploadId, new Map());
+      this.timestamps.set(uploadId, new Date());
+      this.parentIds.set(uploadId, parentId);
+    }
+  }
+
   /**
    * Add a chunk ETag to the tracker
    */
@@ -43,6 +57,13 @@ class ChunkTracker {
     }
 
     this.chunks.get(uploadId)!.set(chunkIndex, etag);
+  }
+
+  /**
+   * Get the calculated parent ID for an upload
+   */
+  getParentId(uploadId: string): string | null {
+    return this.parentIds.get(uploadId) || null;
   }
 
   /**
@@ -92,6 +113,7 @@ class ChunkTracker {
   cleanup(uploadId: string): void {
     this.chunks.delete(uploadId);
     this.timestamps.delete(uploadId);
+    this.parentIds.delete(uploadId);
   }
 
   /**
