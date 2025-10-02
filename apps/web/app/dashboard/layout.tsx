@@ -1,6 +1,10 @@
 "use client";
 
 import {
+  FileProcessingProvider,
+  useFileProcessing,
+} from "@/lib/contexts/file-processing-context";
+import {
   SelectionProvider,
   useSelection,
 } from "@/lib/contexts/selection-context";
@@ -139,7 +143,13 @@ function HeaderTitle() {
 }
 
 // Header Actions Component (Right side - Settings/Upload or Download/Delete)
-function HeaderActions() {
+function HeaderActions({
+  onFileUpload,
+  onCreateFolder,
+}: {
+  onFileUpload: (files: FileList, parentId?: string) => void;
+  onCreateFolder: () => void;
+}) {
   const { selectedFiles, clearSelection } = useSelection();
   const itemOperations = useItemOperations();
   const [isHeaderUploadDropdownOpen, setIsHeaderUploadDropdownOpen] =
@@ -181,30 +191,34 @@ function HeaderActions() {
   });
   const files = pagination.getPageItems(allFiles);
 
-  // File upload handlers (moved from main component)
+  // File upload handler - now properly calls the parent's handleFileUpload
   const triggerFileUpload = (isFolder: boolean) => {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
     if (isFolder) {
       input.webkitdirectory = true;
+      // Add additional attributes for better browser support
+      input.setAttribute("directory", "");
+      input.setAttribute("mozdirectory", "");
     }
 
-    input.onchange = async (e) => {
+    input.onchange = (e) => {
       const target = e.target as HTMLInputElement;
-      if (target.files && target.files.length > 0) {
-        const fileArray = Array.from(target.files);
-        // Handle file upload logic here
-        console.log("Files selected:", fileArray);
+      if (target.files) {
+        // Get the parent folder ID for current path
+        const parentId =
+          currentFolderPath.length === 0
+            ? undefined
+            : folderData?.folderId || undefined;
+        onFileUpload(target.files, parentId);
       }
     };
-
     input.click();
   };
 
   const handleCreateFolderClick = () => {
-    // This would need to be connected to the modal state
-    console.log("Create folder clicked");
+    onCreateFolder();
   };
 
   if (selectedFiles.length > 0) {
@@ -402,17 +416,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [newFolderName, setNewFolderName] = useState("");
   const { validationModal, showValidationModal, hideValidationModal } =
     useValidationModal();
-  const [fileProcessingProgress, setFileProcessingProgress] = useState<{
-    isProcessing: boolean;
-    processedFiles: number;
-    totalFiles: number;
-    currentFile: string;
-  }>({
-    isProcessing: false,
-    processedFiles: 0,
-    totalFiles: 0,
-    currentFile: "",
-  });
+  const {
+    layoutProcessingProgress,
+    updateLayoutProcessingProgress,
+    clearLayoutProcessing,
+    pageProcessingProgress,
+  } = useFileProcessing();
 
   // State for tracking expanded folders
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
@@ -661,7 +670,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     }
 
     // Folder upload - show progress
-    setFileProcessingProgress({
+    updateLayoutProcessingProgress({
       isProcessing: true,
       processedFiles: 0,
       totalFiles: fileArray.length,
@@ -674,11 +683,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       const file = fileArray[i];
 
       // Update progress
-      setFileProcessingProgress((prev) => ({
-        ...prev,
-        processedFiles: i,
+      updateLayoutProcessingProgress({
+        processedFiles: i + 1,
         currentFile: file.name,
-      }));
+      });
 
       // Small delay to allow UI to update and prevent blocking
       if (i % 10 === 0) {
@@ -689,11 +697,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     }
 
     // Final progress update
-    setFileProcessingProgress((prev) => ({
-      ...prev,
+    updateLayoutProcessingProgress({
       processedFiles: fileArray.length,
       currentFile: "Validating files...",
-    }));
+    });
 
     // Small delay before validation
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -712,12 +719,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       const processedFiles = await processFilesWithProgress(files);
 
       // Clear processing progress
-      setFileProcessingProgress({
-        isProcessing: false,
-        processedFiles: 0,
-        totalFiles: 0,
-        currentFile: "",
-      });
+      clearLayoutProcessing();
 
       // Pre-validation before upload
       if (!storageData?.user) {
@@ -766,12 +768,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       console.error("Upload failed:", error);
 
       // Clear processing progress on error
-      setFileProcessingProgress({
-        isProcessing: false,
-        processedFiles: 0,
-        totalFiles: 0,
-        currentFile: "",
-      });
+      clearLayoutProcessing();
 
       // Show error message
       const errorMessage =
@@ -1194,14 +1191,17 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               ) : (
                 <div className="flex h-16 min-h-16 w-full items-center justify-between border-b border-gray-200 px-6">
                   <HeaderTitle />
-                  <HeaderActions />
+                  <HeaderActions
+                    onFileUpload={handleFileUpload}
+                    onCreateFolder={() => setIsCreateFolderModalOpen(true)}
+                  />
                 </div>
               )}
 
               {children}
 
-              {/* File Processing Progress */}
-              {fileProcessingProgress.isProcessing && (
+              {/* Layout File Processing Progress */}
+              {layoutProcessingProgress.isProcessing && (
                 <div className="fixed right-4 bottom-4 w-80 rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
                   <div className="flex items-center space-x-3">
                     <div className="flex-shrink-0">
@@ -1213,8 +1213,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                           Processing folder...
                         </p>
                         <span className="text-gray-500">
-                          {fileProcessingProgress.processedFiles} /{" "}
-                          {fileProcessingProgress.totalFiles}
+                          {layoutProcessingProgress.processedFiles} /{" "}
+                          {layoutProcessingProgress.totalFiles}
                         </span>
                       </div>
                       <div className="mt-2">
@@ -1222,14 +1222,54 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                           <div
                             className="h-2 rounded-full bg-green-500 transition-all duration-300"
                             style={{
-                              width: `${(fileProcessingProgress.processedFiles / fileProcessingProgress.totalFiles) * 100}%`,
+                              width: `${(layoutProcessingProgress.processedFiles / layoutProcessingProgress.totalFiles) * 100}%`,
                             }}
                           />
                         </div>
                       </div>
-                      {fileProcessingProgress.currentFile && (
+                      {layoutProcessingProgress.currentFile && (
                         <p className="mt-1 truncate text-xs text-gray-500">
-                          {fileProcessingProgress.currentFile}
+                          {layoutProcessingProgress.currentFile}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Page File Processing Progress (for drag-and-drop) */}
+              {pageProcessingProgress.isProcessing && (
+                <div className="fixed right-4 bottom-4 w-80 rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex-shrink-0">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-green-600"></div>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <p className="font-medium text-gray-900">
+                          Processing folder...
+                        </p>
+                        <span className="text-gray-500">
+                          {pageProcessingProgress.processedFiles} /{" "}
+                          {pageProcessingProgress.totalFiles || "?"}
+                        </span>
+                      </div>
+                      <div className="mt-2">
+                        <div className="h-2 w-full rounded-full bg-gray-200">
+                          <div
+                            className="h-2 rounded-full bg-green-500 transition-all duration-300"
+                            style={{
+                              width:
+                                pageProcessingProgress.totalFiles > 0
+                                  ? `${(pageProcessingProgress.processedFiles / pageProcessingProgress.totalFiles) * 100}%`
+                                  : "0%",
+                            }}
+                          />
+                        </div>
+                      </div>
+                      {pageProcessingProgress.currentFile && (
+                        <p className="mt-1 truncate text-xs text-gray-500">
+                          {pageProcessingProgress.currentFile}
                         </p>
                       )}
                     </div>
@@ -1739,7 +1779,9 @@ export default function DashboardLayout({
       <SelectionProvider>
         <UploadProgressProvider>
           <ValidationModalProvider>
-            <DashboardLayoutContent>{children}</DashboardLayoutContent>
+            <FileProcessingProvider>
+              <DashboardLayoutContent>{children}</DashboardLayoutContent>
+            </FileProcessingProvider>
           </ValidationModalProvider>
         </UploadProgressProvider>
       </SelectionProvider>

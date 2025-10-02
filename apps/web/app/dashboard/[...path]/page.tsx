@@ -19,7 +19,7 @@ import {
   Upload,
 } from "lucide-react";
 import Link from "next/link";
-import { use, useState } from "react";
+import { use } from "react";
 import toast from "react-hot-toast";
 
 interface FolderNavigationPageProps {
@@ -36,17 +36,6 @@ export default function FolderNavigationPage({
     isAllSelected,
     isIndeterminate,
   } = useSelection();
-  const [fileProcessingProgress, setFileProcessingProgress] = useState<{
-    isProcessing: boolean;
-    processedFiles: number;
-    totalFiles: number;
-    currentFile: string;
-  }>({
-    isProcessing: false,
-    processedFiles: 0,
-    totalFiles: 0,
-    currentFile: "",
-  });
 
   // Resolve params using React 18 use() hook
   const resolvedParams = use(params);
@@ -69,9 +58,7 @@ export default function FolderNavigationPage({
 
   // Drag and drop functionality
   const { isDragOver, handleDragOver, handleDragLeave, handleDrop } =
-    useDragDrop(folderData?.folderId || undefined, (progress) => {
-      setFileProcessingProgress(progress);
-    });
+    useDragDrop(folderData?.folderId || undefined);
 
   const isLoading = isLoadingPath || isLoadingItems;
 
@@ -340,46 +327,6 @@ export default function FolderNavigationPage({
           </div>
         )}
       </div>
-
-      {/* File Processing Progress */}
-      {fileProcessingProgress.isProcessing && (
-        <div className="fixed right-4 bottom-4 w-80 rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
-          <div className="flex items-center space-x-3">
-            <div className="flex-shrink-0">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-green-600"></div>
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between text-sm">
-                <p className="font-medium text-gray-900">
-                  Processing folder...
-                </p>
-                <span className="text-gray-500">
-                  {fileProcessingProgress.processedFiles} /{" "}
-                  {fileProcessingProgress.totalFiles || "?"}
-                </span>
-              </div>
-              <div className="mt-2">
-                <div className="h-2 w-full rounded-full bg-gray-200">
-                  <div
-                    className="h-2 rounded-full bg-green-500 transition-all duration-300"
-                    style={{
-                      width:
-                        fileProcessingProgress.totalFiles > 0
-                          ? `${(fileProcessingProgress.processedFiles / fileProcessingProgress.totalFiles) * 100}%`
-                          : "0%",
-                    }}
-                  />
-                </div>
-              </div>
-              {fileProcessingProgress.currentFile && (
-                <p className="mt-1 truncate text-xs text-gray-500">
-                  {fileProcessingProgress.currentFile}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

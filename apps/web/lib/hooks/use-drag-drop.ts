@@ -1,3 +1,4 @@
+import { useFileProcessing } from "@/lib/contexts/file-processing-context";
 import { useUploadProgress } from "@/lib/contexts/upload-progress-context";
 import { useValidationModal } from "@/lib/contexts/validation-modal-context";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,18 +11,12 @@ import {
 } from "./use-upload-validation";
 import { useUserStorage } from "./use-user-storage";
 
-export function useDragDrop(
-  parentId?: string,
-  onProcessingProgress?: (progress: {
-    isProcessing: boolean;
-    processedFiles: number;
-    totalFiles: number;
-    currentFile: string;
-  }) => void,
-) {
+export function useDragDrop(parentId?: string) {
   const [isDragOver, setIsDragOver] = useState(false);
   const { uploadingFiles, setUploadingFiles } = useUploadProgress();
   const { showValidationModal } = useValidationModal();
+  const { updatePageProcessingProgress, clearPageProcessing } =
+    useFileProcessing();
   const itemOperations = useItemOperations();
   const { data: storageData } = useUserStorage();
   const queryClient = useQueryClient();
@@ -133,28 +128,22 @@ export function useDragDrop(
       let processedFiles = 0;
 
       // Start progress tracking
-      if (onProcessingProgress) {
-        onProcessingProgress({
-          isProcessing: true,
-          processedFiles: 0,
-          totalFiles: 0, // We don't know total yet
-          currentFile: "Scanning folders...",
-        });
-      }
+      updatePageProcessingProgress({
+        isProcessing: true,
+        processedFiles: 0,
+        totalFiles: 0, // We don't know total yet
+        currentFile: "Scanning folders...",
+      });
 
       for (const item of items) {
         const entry = item.webkitGetAsEntry?.();
         if (entry) {
           if (entry.isFile) {
             // Single file
-            if (onProcessingProgress) {
-              onProcessingProgress({
-                isProcessing: true,
-                processedFiles: processedFiles++,
-                totalFiles: 0,
-                currentFile: entry.name,
-              });
-            }
+            updatePageProcessingProgress({
+              processedFiles: processedFiles++,
+              currentFile: entry.name,
+            });
 
             const file = await new Promise<File>((resolve) => {
               (entry as FileSystemFileEntry).file(resolve);
@@ -166,14 +155,10 @@ export function useDragDrop(
               entry as FileSystemDirectoryEntry,
               "",
               (fileName) => {
-                if (onProcessingProgress) {
-                  onProcessingProgress({
-                    isProcessing: true,
-                    processedFiles: processedFiles++,
-                    totalFiles: 0,
-                    currentFile: fileName,
-                  });
-                }
+                updatePageProcessingProgress({
+                  processedFiles: processedFiles++,
+                  currentFile: fileName,
+                });
               },
             );
             allFiles.push(...folderFiles);
@@ -182,28 +167,18 @@ export function useDragDrop(
       }
 
       // Update progress with final count
-      if (onProcessingProgress) {
-        onProcessingProgress({
-          isProcessing: true,
-          processedFiles: allFiles.length,
-          totalFiles: allFiles.length,
-          currentFile: "Validating files...",
-        });
-      }
+      updatePageProcessingProgress({
+        processedFiles: allFiles.length,
+        totalFiles: allFiles.length,
+        currentFile: "Validating files...",
+      });
 
       if (allFiles.length === 0) {
         // Use the folder names we extracted before processing
         const emptyFolderNames = allFolderNames;
 
         // Clear processing progress
-        if (onProcessingProgress) {
-          onProcessingProgress({
-            isProcessing: false,
-            processedFiles: 0,
-            totalFiles: 0,
-            currentFile: "",
-          });
-        }
+        clearPageProcessing();
 
         // Create empty folders for the user
         if (emptyFolderNames.length > 0) {
@@ -277,14 +252,7 @@ export function useDragDrop(
       );
 
       // Clear processing progress
-      if (onProcessingProgress) {
-        onProcessingProgress({
-          isProcessing: false,
-          processedFiles: 0,
-          totalFiles: 0,
-          currentFile: "",
-        });
-      }
+      clearPageProcessing();
 
       // Show validation errors
       if (!validation.isValid) {
@@ -347,14 +315,7 @@ export function useDragDrop(
       );
 
       // Clear processing progress (in case it was running)
-      if (onProcessingProgress) {
-        onProcessingProgress({
-          isProcessing: false,
-          processedFiles: 0,
-          totalFiles: 0,
-          currentFile: "",
-        });
-      }
+      clearPageProcessing();
 
       // Show validation errors
       if (!validation.isValid) {
