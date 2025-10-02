@@ -297,9 +297,9 @@ export default function Home() {
         {/* Upload Progress */}
         {uploadingFiles.length > 0 && (
           <div className="fixed right-4 bottom-4 w-80 space-y-2">
-            {uploadingFiles.map((file, index) => (
+            {uploadingFiles.map((file) => (
               <div
-                key={index}
+                key={file.fileName + file.size}
                 className="rounded-lg border border-gray-200 bg-white p-4 shadow-lg"
               >
                 <div className="mb-2 flex items-center justify-between">
