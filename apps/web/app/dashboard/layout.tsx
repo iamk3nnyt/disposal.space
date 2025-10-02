@@ -395,8 +395,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [renameValue, setRenameValue] = useState("");
   const [uploadingFiles, setUploadingFiles] = useState<UploadProgress[]>([]);
   const [isUploadDropdownOpen, setIsUploadDropdownOpen] = useState(false);
-  const [isHeaderUploadDropdownOpen, setIsHeaderUploadDropdownOpen] =
-    useState(false);
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [validationModal, setValidationModal] = useState<{
@@ -819,7 +817,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       const target = event.target as Element;
       if (!target.closest(".upload-dropdown")) {
         setIsUploadDropdownOpen(false);
-        setIsHeaderUploadDropdownOpen(false);
       }
     };
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
 
 // Types
 export interface ItemDownloadResponse {
@@ -698,11 +697,6 @@ async function uploadFilesWithProgress(
 
           // Notify parent about file completion (for cache invalidation)
           onFileComplete?.(file.name);
-
-          // Show individual success toast
-          setTimeout(() => {
-            toast.success(`"${file.name}" uploaded successfully!`);
-          }, 100);
 
           // Update progress one final time before removing from display
           updateProgress(
