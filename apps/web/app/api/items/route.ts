@@ -216,12 +216,13 @@ async function handleFileUploadWithSSE(
 
         // Calculate total size of all files to check if batch would exceed limit
         const totalBatchSize = files.reduce((sum, file) => sum + file.size, 0);
-        if (user.storageUsed + totalBatchSize > user.storageLimit) {
+        const availableStorage = user.storageLimit - user.storageUsed;
+        if (totalBatchSize > availableStorage) {
           sendSSEEvent({
             category: "upload",
             type: "error",
             data: {
-              message: `Storage limit exceeded. Uploading ${files.length} file(s) would exceed your ${Math.round(user.storageLimit / (1024 * 1024 * 1024))}GB limit. Available space: ${formatFileSize(user.storageLimit - user.storageUsed)}.`,
+              message: `Insufficient storage space. Upload size: ${formatFileSize(totalBatchSize)}, Available: ${formatFileSize(availableStorage)}`,
             },
           });
           controller.close();
@@ -477,14 +478,15 @@ async function handleFileUpload(
 
   // Calculate total size of all files to check if batch would exceed limit
   const totalBatchSize = files.reduce((sum, file) => sum + file.size, 0);
-  if (user.storageUsed + totalBatchSize > user.storageLimit) {
+  const availableStorage = user.storageLimit - user.storageUsed;
+  if (totalBatchSize > availableStorage) {
     return NextResponse.json(
       {
-        error: `Storage limit exceeded. Uploading ${files.length} file(s) would exceed your ${Math.round(user.storageLimit / (1024 * 1024 * 1024))}GB limit. Available space: ${formatFileSize(user.storageLimit - user.storageUsed)}.`,
+        error: `Insufficient storage space. Upload size: ${formatFileSize(totalBatchSize)}, Available: ${formatFileSize(availableStorage)}`,
         currentUsage: user.storageUsed,
         limit: user.storageLimit,
-        totalBatchSize,
-        availableSpace: user.storageLimit - user.storageUsed,
+        requestedSize: totalBatchSize,
+        availableSpace: availableStorage,
       },
       { status: 413 },
     );

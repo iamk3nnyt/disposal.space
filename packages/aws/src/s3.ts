@@ -1,4 +1,5 @@
 import {
+  AbortMultipartUploadCommand,
   CompleteMultipartUploadCommand,
   CreateMultipartUploadCommand,
   DeleteObjectCommand,
@@ -35,6 +36,11 @@ export interface FileMetadata {
   size: number;
   lastModified: Date;
   contentType?: string;
+}
+
+export interface ChunkedUploadPart {
+  ETag: string;
+  PartNumber: number;
 }
 
 // Upload file to S3
@@ -383,5 +389,118 @@ export async function uploadFileAuto(
     return uploadLargeFile(buffer, key, contentType);
   } else {
     return uploadFile(buffer, key, contentType);
+  }
+}
+
+// ============================================================================
+// CHUNKED UPLOAD FUNCTIONS (for ETag tracker approach)
+// ============================================================================
+
+// Initialize a chunked upload session
+export async function initializeChunkedUpload(
+  key: string,
+  contentType?: string
+): Promise<string> {
+  try {
+    const command = new CreateMultipartUploadCommand({
+      Bucket: awsConfig.bucketName,
+      Key: key,
+      ContentType: contentType,
+    });
+
+    const response = await s3Client.send(command);
+
+    if (!response.UploadId) {
+      throw new Error("Failed to initialize chunked upload");
+    }
+
+    return response.UploadId;
+  } catch (error) {
+    throw new Error(`Failed to initialize chunked upload: ${error}`);
+  }
+}
+
+// Upload a single chunk
+export async function uploadChunk(
+  uploadId: string,
+  key: string,
+  partNumber: number,
+  buffer: Buffer
+): Promise<ChunkedUploadPart> {
+  try {
+    const command = new UploadPartCommand({
+      Bucket: awsConfig.bucketName,
+      Key: key,
+      PartNumber: partNumber,
+      UploadId: uploadId,
+      Body: buffer,
+    });
+
+    const response = await s3Client.send(command);
+
+    if (!response.ETag) {
+      throw new Error("Failed to get ETag from chunk upload");
+    }
+
+    return {
+      ETag: response.ETag,
+      PartNumber: partNumber,
+    };
+  } catch (error) {
+    throw new Error(`Failed to upload chunk ${partNumber}: ${error}`);
+  }
+}
+
+// Complete a chunked upload
+export async function completeChunkedUpload(
+  uploadId: string,
+  key: string,
+  parts: ChunkedUploadPart[]
+): Promise<UploadResult> {
+  try {
+    // Sort parts by PartNumber to ensure correct order
+    const sortedParts = parts.sort((a, b) => a.PartNumber - b.PartNumber);
+
+    const command = new CompleteMultipartUploadCommand({
+      Bucket: awsConfig.bucketName,
+      Key: key,
+      UploadId: uploadId,
+      MultipartUpload: {
+        Parts: sortedParts,
+      },
+    });
+
+    const response = await s3Client.send(command);
+
+    // Calculate total size from parts (approximate)
+    const totalSize = parts.length * 5 * 1024 * 1024; // Rough estimate
+
+    return {
+      key,
+      url:
+        response.Location ||
+        `https://${awsConfig.bucketName}.s3.${awsConfig.region}.amazonaws.com/${key}`,
+      size: totalSize,
+    };
+  } catch (error) {
+    throw new Error(`Failed to complete chunked upload: ${error}`);
+  }
+}
+
+// Abort a chunked upload (cleanup)
+export async function abortChunkedUpload(
+  uploadId: string,
+  key: string
+): Promise<void> {
+  try {
+    const command = new AbortMultipartUploadCommand({
+      Bucket: awsConfig.bucketName,
+      Key: key,
+      UploadId: uploadId,
+    });
+
+    await s3Client.send(command);
+  } catch (error) {
+    throw new Error(`Failed to abort chunked upload: ${error}`);
   }
 }

@@ -1,4 +1,6 @@
 import {
+  abortChunkedUpload,
+  completeChunkedUpload,
   deleteFile,
   downloadFile,
   downloadFileRange,
@@ -6,7 +8,10 @@ import {
   generateDownloadUrl,
   generateUploadUrl,
   getFileMetadata,
+  initializeChunkedUpload,
+  uploadChunk,
   uploadFileAuto,
+  type ChunkedUploadPart,
   type FileMetadata,
 } from "./s3";
 import {
@@ -164,6 +169,106 @@ export class FileProcessor {
   async getUserFiles(userId: string): Promise<FileMetadata[]> {
     const { listFiles } = await import("./s3");
     return await listFiles(`files/${userId}/`);
+  }
+
+  // ============================================================================
+  // CHUNKED UPLOAD METHODS (for large files)
+  // ============================================================================
+
+  // Process and upload file in chunks (for large files)
+  async uploadAndProcessChunked(
+    chunks: Buffer[],
+    originalName: string,
+    userId: string,
+    uploadId: string,
+    key: string
+  ): Promise<ProcessedFile> {
+    try {
+      // Validate first chunk for file type and malicious patterns
+      const firstChunk = chunks[0];
+      if (!firstChunk) {
+        throw new Error("No chunks provided");
+      }
+
+      // Smart MIME type detection using first chunk
+      const smartDetection = detectMimeTypeSmart(firstChunk, originalName);
+      const mimeType = smartDetection.mimeType;
+
+      // Validate file type
+      if (!validateFileType(originalName, this.options.allowedTypes)) {
+        throw new Error(
+          `File type not allowed. Allowed types: ${this.options.allowedTypes?.join(
+            ", "
+          )}`
+        );
+      }
+
+      // Validate content matches detected type (using first chunk)
+      const contentValidation = validateContentType(
+        firstChunk,
+        mimeType,
+        originalName
+      );
+      if (!contentValidation.isValid) {
+        throw new Error(
+          `Content validation failed: ${contentValidation.reason}`
+        );
+      }
+
+      // Check for malicious patterns in first chunk
+      if (detectMaliciousPatterns(firstChunk, mimeType)) {
+        throw new Error("File contains potentially malicious content");
+      }
+
+      // Upload all chunks to S3
+      const parts: ChunkedUploadPart[] = [];
+      let totalSize = 0;
+
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const partNumber = i + 1; // S3 parts start at 1
+
+        const part = await uploadChunk(uploadId, key, partNumber, chunk);
+        parts.push(part);
+        totalSize += chunk.length;
+      }
+
+      // Complete the multipart upload
+      const result = await completeChunkedUpload(uploadId, key, parts);
+
+      return {
+        key: result.key,
+        url: result.url,
+        size: totalSize, // Use actual calculated size
+        mimeType,
+        originalName,
+      };
+    } catch (error) {
+      // Clean up failed upload
+      try {
+        await abortChunkedUpload(uploadId, key);
+      } catch (cleanupError) {
+        console.error("Failed to cleanup chunked upload:", cleanupError);
+      }
+      throw error;
+    }
+  }
+
+  // Initialize a chunked upload session
+  async initializeChunkedUpload(
+    originalName: string,
+    userId: string
+  ): Promise<{ uploadId: string; key: string }> {
+    const key = generateFileKey(userId, originalName);
+    const mimeType = getMimeType(originalName);
+    const uploadId = await initializeChunkedUpload(key, mimeType);
+
+    return { uploadId, key };
+  }
+
+  // Abort a chunked upload (cleanup)
+  async abortChunkedUpload(uploadId: string, key: string): Promise<void> {
+    await abortChunkedUpload(uploadId, key);
   }
 }
 

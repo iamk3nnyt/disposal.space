@@ -367,8 +367,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     // Check if this is a folder upload by looking for webkitRelativePath
     const hasWebkitRelativePath = fileArray.some(
       (file) =>
-        (file as any).webkitRelativePath &&
-        (file as any).webkitRelativePath !== "",
+        (file as File & { webkitRelativePath?: string }).webkitRelativePath &&
+        (file as File & { webkitRelativePath?: string }).webkitRelativePath !==
+          "",
     );
 
     if (!hasWebkitRelativePath) {

@@ -331,18 +331,179 @@ async function updateItem(
   return response.json();
 }
 
-// Upload files with unified SSE progress tracking
+// Constants for chunked uploads
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks (S3 minimum)
+const CHUNKED_UPLOAD_THRESHOLD = 100 * 1024 * 1024; // 100MB threshold
+
+// Upload a single file using chunked upload
+async function uploadFileInChunks(
+  file: File,
+  parentId?: string,
+  onProgress?: (progress: UploadProgress[]) => void,
+): Promise<UploadResponse> {
+  const fileName = file.name;
+  const fileSize = file.size;
+  const totalChunks = Math.ceil(fileSize / CHUNK_SIZE);
+
+  // Initialize progress
+  const initialProgress: UploadProgress[] = [
+    {
+      fileName,
+      progress: 0,
+      size: formatFileSize(fileSize),
+      status: "uploading" as const,
+      isFolder: false,
+    },
+  ];
+
+  onProgress?.(initialProgress);
+
+  try {
+    // Step 1: Initialize chunked upload
+    const initResponse = await fetch("/api/items/chunked", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName,
+        fileSize,
+        parentId,
+      }),
+    });
+
+    if (!initResponse.ok) {
+      const error = await initResponse.json();
+      throw new Error(error.error || "Failed to initialize chunked upload");
+    }
+
+    const { uploadId, s3Key } = await initResponse.json();
+
+    // Step 2: Upload chunks
+    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+      const start = chunkIndex * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, fileSize);
+      const chunk = file.slice(start, end);
+
+      const formData = new FormData();
+      formData.append("uploadId", uploadId);
+      formData.append("s3Key", s3Key);
+      formData.append("chunkIndex", chunkIndex.toString());
+      formData.append("totalChunks", totalChunks.toString());
+      formData.append("chunk", chunk);
+
+      const chunkResponse = await fetch("/api/items/chunked/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!chunkResponse.ok) {
+        const error = await chunkResponse.json();
+        throw new Error(
+          error.error || `Failed to upload chunk ${chunkIndex + 1}`,
+        );
+      }
+
+      const chunkResult = await chunkResponse.json();
+
+      // Update progress
+      const progress = chunkResult.progress;
+      const updatedProgress: UploadProgress[] = [
+        {
+          fileName,
+          progress,
+          size: formatFileSize(fileSize),
+          status: progress >= 100 ? "processing" : "uploading",
+          isFolder: false,
+        },
+      ];
+
+      onProgress?.(updatedProgress);
+    }
+
+    // Step 3: Complete upload
+    const completeResponse = await fetch("/api/items/chunked/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        uploadId,
+        s3Key,
+        fileName,
+        fileSize,
+        totalChunks,
+        parentId,
+        mimeType: file.type || "application/octet-stream",
+      }),
+    });
+
+    if (!completeResponse.ok) {
+      const error = await completeResponse.json();
+      throw new Error(error.error || "Failed to complete chunked upload");
+    }
+
+    // Final progress update
+    const completedProgress: UploadProgress[] = [
+      {
+        fileName,
+        progress: 100,
+        size: formatFileSize(fileSize),
+        status: "completed" as const,
+        isFolder: false,
+      },
+    ];
+
+    onProgress?.(completedProgress);
+
+    return { success: true };
+  } catch (error) {
+    // Error progress update
+    const errorProgress: UploadProgress[] = [
+      {
+        fileName,
+        progress: 0,
+        size: formatFileSize(fileSize),
+        status: "error" as const,
+        error: error instanceof Error ? error.message : "Upload failed",
+        isFolder: false,
+      },
+    ];
+
+    onProgress?.(errorProgress);
+    throw error;
+  }
+}
+
+// Upload files with unified SSE progress tracking (now with chunked support)
 async function uploadFilesWithProgress(
   files: File[],
   parentId?: string,
   onProgress?: (progress: UploadProgress[]) => void,
 ): Promise<UploadResponse> {
+  // Route files based on size: large files use chunked upload, small files use existing SSE
+  const largeFiles = files.filter(
+    (file) => file.size >= CHUNKED_UPLOAD_THRESHOLD,
+  );
+  const smallFiles = files.filter(
+    (file) => file.size < CHUNKED_UPLOAD_THRESHOLD,
+  );
+
+  // Handle large files with chunked upload (one at a time for now)
+  if (largeFiles.length > 0) {
+    for (const file of largeFiles) {
+      await uploadFileInChunks(file, parentId, onProgress);
+    }
+  }
+
+  // Handle small files with existing SSE streaming (if any)
+  if (smallFiles.length === 0) {
+    return { success: true };
+  }
+
+  // Continue with existing SSE logic for small files
   // Note: Storage limit validation is handled by the backend
 
   const formData = new FormData();
 
-  // Add files to form data with path information
-  files.forEach((file) => {
+  // Add small files to form data with path information
+  smallFiles.forEach((file) => {
     formData.append("files", file);
 
     // Add the webkitRelativePath separately if it exists
@@ -380,7 +541,7 @@ async function uploadFilesWithProgress(
   };
 
   // Initialize progress tracking with hybrid approach
-  const folderName = detectFolderUpload(files);
+  const folderName = detectFolderUpload(smallFiles);
   const isFromFolder = folderName !== null;
 
   const initialProgress: UploadProgress[] = isFromFolder
@@ -388,16 +549,16 @@ async function uploadFilesWithProgress(
         {
           fileName: `📁 ${folderName}`,
           progress: 0,
-          size: `0 of ${files.length} files`,
+          size: `0 of ${smallFiles.length} files`,
           status: "uploading" as const,
           isFolder: true,
           fileCount: {
-            total: files.length,
+            total: smallFiles.length,
             processed: 0,
           },
         },
       ]
-    : files.map((file) => ({
+    : smallFiles.map((file) => ({
         fileName: file.name,
         progress: 0,
         size: formatFileSize(file.size),

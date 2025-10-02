@@ -18,7 +18,7 @@ export interface ValidationResult {
 
 export interface ValidationConfig {
   maxIndividualFileSize?: number; // Optional - undefined means no limit
-  maxBatchSize: number;
+  maxBatchSize?: number; // Optional - undefined means no limit
   maxBatchTotalSize?: number; // Optional - undefined means no limit
   storageBuffer: number;
 }
@@ -48,8 +48,8 @@ export function validateFilesBeforeUpload(
     return result;
   }
 
-  // 2. Check file count limit
-  if (files.length > config.maxBatchSize) {
+  // 2. Check file count limit (removed - no arbitrary limits with chunked uploads)
+  if (config.maxBatchSize && files.length > config.maxBatchSize) {
     result.errors.push(
       `Too many files selected. Maximum: ${config.maxBatchSize} files per upload.`,
     );
@@ -88,19 +88,19 @@ export function validateFilesBeforeUpload(
 
   // 5. Check user storage limit
   const availableStorage = userStorage.storageLimit - userStorage.storageUsed;
-  const requiredStorage = result.totalSize + config.storageBuffer;
+  const requiredStorage = result.totalSize; // No buffer needed - overhead is negligible
 
   if (requiredStorage > availableStorage) {
     result.errors.push(
-      `Insufficient storage space. Required: ${formatFileSize(requiredStorage)}, Available: ${formatFileSize(availableStorage)}`,
+      `Insufficient storage space. Upload size: ${formatFileSize(requiredStorage)}, Available: ${formatFileSize(availableStorage)}`,
     );
     result.isValid = false;
   }
 
-  // 6. Add warnings for performance considerations
-  if (files.length > 50) {
+  // 6. Add warnings for performance considerations (updated threshold)
+  if (files.length > 500) {
     result.warnings.push(
-      `Uploading ${files.length} files. Consider uploading in smaller batches for better performance.`,
+      `Uploading ${files.length} files. Large batches may take longer to process.`,
     );
   }
 
@@ -125,11 +125,11 @@ export function getValidationConfig(): ValidationConfig {
   return {
     // No individual file size limit - users can upload any size file
     maxIndividualFileSize: undefined,
-    // Reasonable batch size to prevent UI performance issues
-    maxBatchSize: 100,
+    // No file count limit - chunked uploads handle performance
+    maxBatchSize: undefined,
     // No batch total size limit - only user's storage limit applies
     maxBatchTotalSize: undefined,
-    // Small buffer for metadata/overhead
-    storageBuffer: 100 * 1024 * 1024, // 100MB buffer
+    // No storage buffer needed - database overhead is negligible (~299 bytes per file)
+    storageBuffer: 0,
   };
 }
