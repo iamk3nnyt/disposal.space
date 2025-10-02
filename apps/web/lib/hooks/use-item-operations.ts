@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 
 // Types
 export interface ItemDownloadResponse {
@@ -488,6 +489,7 @@ async function uploadFilesWithProgress(
   files: File[],
   parentId?: string,
   onProgress?: (progress: UploadProgress[]) => void,
+  onFileComplete?: (fileName: string) => void,
 ): Promise<UploadResponse> {
   if (files.length === 0) {
     return { success: true };
@@ -508,6 +510,9 @@ async function uploadFilesWithProgress(
       status: "uploading" | "processing" | "completed" | "error";
     }
   >();
+
+  // Track completed files to remove them from progress display
+  const completedFiles = new Set<number>();
 
   // Initialize all files with 0% progress
   files.forEach((_, index) => {
@@ -561,19 +566,24 @@ async function uploadFilesWithProgress(
       onProgress?.(progressUpdate);
     } else {
       // Case 2: Multiple individual files - show stacked progress for each file
-      const progressUpdate: UploadProgress[] = files.map((file, index) => {
-        const fileProgress = fileProgressMap.get(index) || {
-          progress: 0,
-          status: "uploading" as const,
-        };
-        return {
-          fileName: file.name,
-          progress: fileProgress.progress,
-          size: formatFileSize(file.size),
-          status: fileProgress.status,
-          isFolder: false,
-        };
-      });
+      // Filter out completed files from progress display
+      const progressUpdate: UploadProgress[] = files
+        .filter((_, index) => !completedFiles.has(index)) // Remove completed files first
+        .map((file) => {
+          // Find the original index in the files array
+          const fileIndex = files.indexOf(file);
+          const fileProgress = fileProgressMap.get(fileIndex) || {
+            progress: 0,
+            status: "uploading" as const,
+          };
+          return {
+            fileName: file.name,
+            progress: fileProgress.progress,
+            size: formatFileSize(file.size),
+            status: fileProgress.status,
+            isFolder: false,
+          };
+        });
 
       onProgress?.(progressUpdate);
     }
@@ -609,12 +619,46 @@ async function uploadFilesWithProgress(
         // Update progress for current file
         const currentFileProgressValue = fileProgress[0]?.progress || 0;
         const currentStatus = fileProgress[0]?.status || "uploading";
-        updateProgress(
-          fileIndex,
-          currentFileProgressValue,
-          file.name,
-          currentStatus,
-        );
+
+        // Check if file just completed
+        if (currentStatus === "completed" && !completedFiles.has(fileIndex)) {
+          // Mark file as completed
+          completedFiles.add(fileIndex);
+
+          // Notify parent about file completion (for cache invalidation)
+          onFileComplete?.(file.name);
+
+          // Show individual success toast
+          setTimeout(() => {
+            toast.success(`"${file.name}" uploaded successfully!`);
+          }, 100);
+
+          // Update progress one final time before removing from display
+          updateProgress(
+            fileIndex,
+            currentFileProgressValue,
+            file.name,
+            currentStatus,
+          );
+
+          // Remove from progress display after a brief delay
+          setTimeout(() => {
+            updateProgress(
+              fileIndex,
+              currentFileProgressValue,
+              file.name,
+              currentStatus,
+            );
+          }, 1000);
+        } else {
+          // Regular progress update
+          updateProgress(
+            fileIndex,
+            currentFileProgressValue,
+            file.name,
+            currentStatus,
+          );
+        }
       }).catch((error) => {
         // Handle individual file upload errors
         updateProgress(fileIndex, 0, file.name, "error");
@@ -712,9 +756,15 @@ export function useItemUpload() {
     }
   >({
     mutationFn: ({ files, parentId, onProgress }) =>
-      uploadFilesWithProgress(files, parentId, onProgress),
+      uploadFilesWithProgress(files, parentId, onProgress, () => {
+        // Individual file completion callback - trigger immediate cache invalidation
+        queryClient.invalidateQueries({ queryKey: ["items"] });
+        queryClient.invalidateQueries({ queryKey: ["folderChildren"] });
+        queryClient.invalidateQueries({ queryKey: ["search"] });
+        queryClient.invalidateQueries({ queryKey: ["user", "storage"] });
+      }),
     onSuccess: () => {
-      // Invalidate all relevant queries to refresh the UI
+      // Final batch completion - ensure all queries are invalidated
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["folderChildren"] });
       queryClient.invalidateQueries({ queryKey: ["search"] });
