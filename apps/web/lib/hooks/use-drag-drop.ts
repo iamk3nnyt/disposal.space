@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { useItemOperations, type UploadProgress } from "./use-item-operations";
@@ -23,6 +24,7 @@ export function useDragDrop(
   const [uploadingFiles, setUploadingFiles] = useState<UploadProgress[]>([]);
   const itemOperations = useItemOperations();
   const { data: storageData } = useUserStorage();
+  const queryClient = useQueryClient();
 
   // Helper function to recursively process directory entries
   const processDirectory = async (
@@ -117,6 +119,15 @@ export function useDragDrop(
     });
 
     if (hasFolder) {
+      // Extract folder names BEFORE processing (for empty folder handling)
+      const allFolderNames: string[] = [];
+      for (const item of items) {
+        const entry = item.webkitGetAsEntry?.();
+        if (entry?.isDirectory) {
+          allFolderNames.push(entry.name);
+        }
+      }
+
       // Handle folder upload by reconstructing files with paths
       const allFiles: File[] = [];
       let processedFiles = 0;
@@ -180,7 +191,77 @@ export function useDragDrop(
         });
       }
 
-      if (allFiles.length === 0) return;
+      if (allFiles.length === 0) {
+        // Use the folder names we extracted before processing
+        const emptyFolderNames = allFolderNames;
+
+        // Clear processing progress
+        if (onProcessingProgress) {
+          onProcessingProgress({
+            isProcessing: false,
+            processedFiles: 0,
+            totalFiles: 0,
+            currentFile: "",
+          });
+        }
+
+        // Create empty folders for the user
+        if (emptyFolderNames.length > 0) {
+          try {
+            const createdFolders: string[] = [];
+
+            for (const folderName of emptyFolderNames) {
+              const response = await fetch("/api/items", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  name: folderName,
+                  type: "folder",
+                  parentId: parentId || null,
+                }),
+              });
+
+              if (!response.ok) {
+                const error = await response.json();
+                throw new Error(
+                  error.error || `Failed to create folder "${folderName}"`,
+                );
+              }
+
+              createdFolders.push(folderName);
+            }
+
+            // Show success message
+            const folderText =
+              createdFolders.length === 1 ? "folder" : "folders";
+            const folderList =
+              createdFolders.length === 1
+                ? `"${createdFolders[0]}"`
+                : createdFolders.map((name) => `"${name}"`).join(", ");
+
+            toast.success(
+              `Empty ${folderText} ${folderList} created successfully!`,
+            );
+
+            // Invalidate queries to refresh the UI (same as regular uploads)
+            queryClient.invalidateQueries({ queryKey: ["items"] });
+            queryClient.invalidateQueries({ queryKey: ["folderChildren"] });
+            queryClient.invalidateQueries({ queryKey: ["search"] });
+            queryClient.invalidateQueries({ queryKey: ["user", "storage"] });
+          } catch (error) {
+            console.error("Failed to create empty folder:", error);
+            const errorMessage =
+              error instanceof Error
+                ? error.message
+                : "Failed to create folders";
+            toast.error(errorMessage);
+          }
+        }
+
+        return;
+      }
 
       // Pre-validation before upload
       if (!storageData?.user) {
