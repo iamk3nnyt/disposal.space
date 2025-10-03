@@ -192,7 +192,7 @@ export async function PUT(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
     const body = await request.json();
-    const { name, parentId } = body;
+    const { name, parentId, isPublic } = body;
     const { id } = await params;
 
     // Get the item to update
@@ -217,6 +217,10 @@ export async function PUT(
 
     if (parentId !== undefined) {
       updateData.parentId = parentId;
+    }
+
+    if (isPublic !== undefined) {
+      updateData.isPublic = isPublic;
     }
 
     const [updatedItem] = await db

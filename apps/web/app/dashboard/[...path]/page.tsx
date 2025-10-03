@@ -2,6 +2,7 @@
 
 import { ContextMenu } from "@/components/context-menu";
 import { Pagination } from "@/components/pagination";
+import { ShareModal } from "@/components/share-modal";
 import { useSelection } from "@/lib/contexts/selection-context";
 import { getFileIcon } from "@/lib/file-icons";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
@@ -21,7 +22,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { use } from "react";
+import { use, useState } from "react";
 import toast from "react-hot-toast";
 
 interface FolderNavigationPageProps {
@@ -69,6 +70,20 @@ export default function FolderNavigationPage({
     handleRowContextMenu,
   } = useContextMenu();
 
+  // Share modal state
+  const [shareModal, setShareModal] = useState<{
+    isOpen: boolean;
+    item: {
+      id: string;
+      name: string;
+      isFolder: boolean;
+      isPublic: boolean;
+    } | null;
+  }>({
+    isOpen: false,
+    item: null,
+  });
+
   const isLoading = isLoadingPath || isLoadingItems;
 
   const allFiles = itemsData?.items || [];
@@ -81,6 +96,31 @@ export default function FolderNavigationPage({
 
   const files = pagination.getPageItems(allFiles);
   const fileIds = files.map((file) => file.id);
+
+  // Share modal functions
+  const openShareModal = (item: {
+    id: string;
+    name: string;
+    isFolder: boolean;
+    isPublic: boolean;
+  }) => {
+    setShareModal({ isOpen: true, item });
+  };
+
+  const closeShareModal = () => {
+    setShareModal({ isOpen: false, item: null });
+  };
+
+  const handleTogglePublic = async (itemId: string, isPublic: boolean) => {
+    await itemOperations.toggleItemPublic(itemId, isPublic);
+    // Update the share modal item state
+    if (shareModal.item && shareModal.item.id === itemId) {
+      setShareModal((prev) => ({
+        ...prev,
+        item: prev.item ? { ...prev.item, isPublic } : null,
+      }));
+    }
+  };
 
   // Error state for invalid paths
   if (pathError) {
@@ -383,20 +423,26 @@ export default function FolderNavigationPage({
             onShare={
               !contextMenu.item.isPublic
                 ? () => {
-                    // TODO: Implement share functionality
-                    toast.success(
-                      `"${contextMenu.item!.name}" shared successfully!`,
-                    );
+                    openShareModal({
+                      id: contextMenu.item!.id,
+                      name: contextMenu.item!.name,
+                      isFolder: contextMenu.item!.isFolder,
+                      isPublic: contextMenu.item!.isPublic,
+                    });
+                    closeContextMenu();
                   }
                 : undefined
             }
             onHide={
               contextMenu.item.isPublic
                 ? () => {
-                    // TODO: Implement hide functionality
-                    toast.success(
-                      `"${contextMenu.item!.name}" is now private!`,
-                    );
+                    openShareModal({
+                      id: contextMenu.item!.id,
+                      name: contextMenu.item!.name,
+                      isFolder: contextMenu.item!.isFolder,
+                      isPublic: contextMenu.item!.isPublic,
+                    });
+                    closeContextMenu();
                   }
                 : undefined
             }
@@ -413,6 +459,16 @@ export default function FolderNavigationPage({
               // TODO: Implement rename functionality
               toast.success("Rename functionality coming soon!");
             }}
+          />
+        )}
+
+        {/* Share Modal */}
+        {shareModal.item && (
+          <ShareModal
+            isOpen={shareModal.isOpen}
+            onClose={closeShareModal}
+            item={shareModal.item}
+            onTogglePublic={handleTogglePublic}
           />
         )}
       </div>

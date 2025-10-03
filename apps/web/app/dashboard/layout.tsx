@@ -143,13 +143,7 @@ function HeaderTitle() {
 }
 
 // Header Actions Component (Right side - Settings/Upload or Download/Delete)
-function HeaderActions({
-  onFileUpload,
-  onCreateFolder,
-}: {
-  onFileUpload: (files: FileList, parentId?: string) => void;
-  onCreateFolder: () => void;
-}) {
+function HeaderActions() {
   const { selectedFiles, clearSelection } = useSelection();
   const itemOperations = useItemOperations();
   const [isHeaderImportDropdownOpen, setIsHeaderImportDropdownOpen] =
@@ -1188,10 +1182,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               ) : (
                 <div className="flex h-16 min-h-16 w-full items-center justify-between border-b border-gray-200 px-6">
                   <HeaderTitle />
-                  <HeaderActions
-                    onFileUpload={handleFileUpload}
-                    onCreateFolder={() => setIsCreateFolderModalOpen(true)}
-                  />
+                  <HeaderActions />
                 </div>
               )}
 

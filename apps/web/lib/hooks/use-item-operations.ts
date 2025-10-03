@@ -81,6 +81,7 @@ export interface CreateItemRequest {
 export interface UpdateItemRequest {
   name?: string;
   parentId?: string;
+  isPublic?: boolean;
 }
 
 // Download item directly (streams through API)
@@ -977,6 +978,11 @@ export function useItemOperations() {
     // Update item (rename, move)
     updateItem: (id: string, data: UpdateItemRequest) => {
       return updateMutation.mutateAsync({ id, data });
+    },
+
+    // Toggle item public status
+    toggleItemPublic: (id: string, isPublic: boolean) => {
+      return updateMutation.mutateAsync({ id, data: { isPublic } });
     },
 
     // Download item
