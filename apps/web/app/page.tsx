@@ -87,7 +87,9 @@ export default function Home() {
 
             {/* CTA Button */}
             <Link
-              href="/#"
+              href="/paper.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center space-x-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800"
             >
               <Download className="h-4 w-4" />
