@@ -213,9 +213,9 @@ export default function SharedFolderPage() {
   if (!folder) return null;
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white px-6">
       {/* Header */}
-      <header className="w-full border-b border-gray-100 bg-white px-6">
+      <header className="w-full border-b border-gray-100 bg-white">
         <div className="mx-auto max-w-7xl">
           <div className="flex h-16 items-center justify-between">
             <Link href="/" className="flex items-center space-x-2">
@@ -245,7 +245,7 @@ export default function SharedFolderPage() {
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto max-w-6xl px-6 py-12">
+      <main className="mx-auto max-w-7xl py-12">
         {/* Folder Header */}
         <div className="mb-8">
           <div className="flex items-start space-x-4">
@@ -406,6 +406,7 @@ export default function SharedFolderPage() {
             totalItems={paginationInfo.totalCount}
             startIndex={pagination.startIndex}
             endIndex={pagination.endIndex}
+            className="px-0 sm:px-0"
           />
         )}
 

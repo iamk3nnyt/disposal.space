@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface PaginationProps {
@@ -13,6 +14,7 @@ interface PaginationProps {
   totalItems: number;
   startIndex: number;
   endIndex: number;
+  className?: string;
 }
 
 export function Pagination({
@@ -26,6 +28,7 @@ export function Pagination({
   totalItems,
   startIndex,
   endIndex,
+  className,
 }: PaginationProps) {
   // Generate page numbers to display
   const getPageNumbers = () => {
@@ -85,7 +88,12 @@ export function Pagination({
   }
 
   return (
-    <div className="sticky bottom-0 flex min-h-22 w-full items-center justify-between border-t border-gray-100 bg-white px-4 py-3 sm:px-6">
+    <div
+      className={cn(
+        "sticky bottom-0 flex min-h-22 w-full items-center justify-between border-t border-gray-100 bg-white px-4 py-3 sm:px-6",
+        className,
+      )}
+    >
       {/* Mobile pagination info */}
       <div className="flex flex-1 justify-between sm:hidden">
         <button
