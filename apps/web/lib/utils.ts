@@ -33,6 +33,7 @@ export function formatItemForFrontend(item: SelectItem) {
     size: item.type === "folder" ? "" : formatFileSize(item.sizeBytes),
     lastModified: formatDate(item.updatedAt),
     isFolder: item.type === "folder",
+    isPublic: item.isPublic,
     sizeBytes: item.sizeBytes,
   };
 }

@@ -204,35 +204,8 @@ function HeaderActions({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // File upload handler - now properly calls the parent's handleFileUpload
-  const triggerFileUpload = (isFolder: boolean) => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.multiple = true;
-    if (isFolder) {
-      input.webkitdirectory = true;
-      // Add additional attributes for better browser support
-      input.setAttribute("directory", "");
-      input.setAttribute("mozdirectory", "");
-    }
-
-    input.onchange = (e) => {
-      const target = e.target as HTMLInputElement;
-      if (target.files) {
-        // Get the parent folder ID for current path
-        const parentId =
-          currentFolderPath.length === 0
-            ? undefined
-            : folderData?.folderId || undefined;
-        onFileUpload(target.files, parentId);
-      }
-    };
-    input.click();
-  };
-
-  const handleCreateFolderClick = () => {
-    onCreateFolder();
-  };
+  // Note: File upload and folder creation handlers are now passed as props
+  // and handled by the parent component
 
   if (selectedFiles.length > 0) {
     // Show bulk actions when files are selected

@@ -55,6 +55,7 @@ export interface FileItem {
   size: string;
   lastModified: string;
   isFolder: boolean;
+  isPublic: boolean;
   sizeBytes: number;
 }
 

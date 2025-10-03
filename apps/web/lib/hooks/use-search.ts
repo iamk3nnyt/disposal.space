@@ -10,6 +10,7 @@ export interface SearchResult {
   size: string;
   lastModified: string;
   isFolder: boolean;
+  isPublic: boolean;
   sizeBytes: number;
   path: string; // Breadcrumb path
   pathSegments: string[]; // Raw path segments for navigation

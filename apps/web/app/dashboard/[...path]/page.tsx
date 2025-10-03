@@ -1,8 +1,10 @@
 "use client";
 
+import { ContextMenu } from "@/components/context-menu";
 import { Pagination } from "@/components/pagination";
 import { useSelection } from "@/lib/contexts/selection-context";
 import { getFileIcon } from "@/lib/file-icons";
+import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import { useDragDrop } from "@/lib/hooks/use-drag-drop";
 import { useFolderPath } from "@/lib/hooks/use-folder-path";
 import { useItemOperations, useItems } from "@/lib/hooks/use-item-operations";
@@ -18,6 +20,7 @@ import {
   Upload,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { use } from "react";
 import toast from "react-hot-toast";
 
@@ -54,10 +57,17 @@ export default function FolderNavigationPage({
     folderData?.folderId,
   );
   const itemOperations = useItemOperations();
+  const router = useRouter();
 
   // Drag and drop functionality
   const { isDragOver, handleDragOver, handleDragLeave, handleDrop } =
     useDragDrop(folderData?.folderId || undefined);
+  const {
+    contextMenu,
+    closeContextMenu,
+    handleRowClick,
+    handleRowContextMenu,
+  } = useContextMenu();
 
   const isLoading = isLoadingPath || isLoadingItems;
 
@@ -181,12 +191,19 @@ export default function FolderNavigationPage({
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {files.map((file, index) => (
-                    <tr key={index} className="group hover:bg-gray-50">
+                    <tr
+                      key={index}
+                      className="group cursor-pointer hover:bg-gray-50"
+                      onClick={(e) => handleRowClick(e, file)}
+                      onContextMenu={(e) => handleRowContextMenu(e, file)}
+                    >
                       <td className="py-4 pl-3">
                         <input
                           type="checkbox"
                           checked={selectedFiles.includes(file.id)}
                           onChange={() => toggleFileSelection(file.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onContextMenu={(e) => e.stopPropagation()}
                           className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                         />
                       </td>
@@ -199,12 +216,15 @@ export default function FolderNavigationPage({
                             <Link
                               href={`/dashboard/${[...folderPath, encodeURIComponent(file.name)].join("/")}`}
                               className="text-sm font-medium text-gray-900 hover:text-green-600"
+                              onClick={(e) => e.stopPropagation()}
+                              onContextMenu={(e) => e.stopPropagation()}
                             >
                               {file.name}
                             </Link>
                           ) : (
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 const previewPromise = itemOperations.preview(
                                   file.id,
                                 );
@@ -215,6 +235,7 @@ export default function FolderNavigationPage({
                                     `Failed to preview "${file.name}": ${err instanceof Error ? err.message : "Preview failed"}`,
                                 });
                               }}
+                              onContextMenu={(e) => e.stopPropagation()}
                               disabled={itemOperations.isDownloading}
                               className="text-left text-sm font-medium text-gray-900 hover:text-green-600 disabled:opacity-50"
                             >
@@ -244,7 +265,8 @@ export default function FolderNavigationPage({
                         {!file.isFolder && (
                           <div className="flex items-center space-x-2">
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 const downloadPromise = itemOperations.download(
                                   file.id,
                                   file.name,
@@ -256,6 +278,7 @@ export default function FolderNavigationPage({
                                     `Failed to download "${file.name}": ${err instanceof Error ? err.message : "Download failed"}`,
                                 });
                               }}
+                              onContextMenu={(e) => e.stopPropagation()}
                               disabled={itemOperations.isDownloading}
                               className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
                               title="Download file"
@@ -263,7 +286,8 @@ export default function FolderNavigationPage({
                               <Download className="h-3 w-3" />
                             </button>
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 const deletePromise = itemOperations.delete(
                                   file.id,
                                 );
@@ -276,6 +300,7 @@ export default function FolderNavigationPage({
                                       : "Delete failed",
                                 });
                               }}
+                              onContextMenu={(e) => e.stopPropagation()}
                               disabled={itemOperations.isDeleting}
                               className="inline-flex items-center rounded-md border border-red-300 bg-white px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
                               title="Delete file"
@@ -320,6 +345,75 @@ export default function FolderNavigationPage({
               </p>
             </div>
           </div>
+        )}
+
+        {/* Context Menu */}
+        {contextMenu.item && (
+          <ContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            isOpen={contextMenu.isOpen}
+            onClose={closeContextMenu}
+            item={contextMenu.item}
+            onDownload={
+              !contextMenu.item.isFolder
+                ? () => {
+                    const downloadPromise = itemOperations.download(
+                      contextMenu.item!.id,
+                      contextMenu.item!.name,
+                    );
+                    toast.promise(downloadPromise, {
+                      loading: `Downloading "${contextMenu.item!.name}"...`,
+                      success: `Downloaded "${contextMenu.item!.name}"`,
+                      error: (err) =>
+                        `Failed to download "${contextMenu.item!.name}": ${err instanceof Error ? err.message : "Download failed"}`,
+                    });
+                  }
+                : undefined
+            }
+            onDelete={() => {
+              const deletePromise = itemOperations.delete(contextMenu.item!.id);
+              toast.promise(deletePromise, {
+                loading: `Deleting "${contextMenu.item!.name}"...`,
+                success: `"${contextMenu.item!.name}" deleted successfully`,
+                error: (err) =>
+                  err instanceof Error ? err.message : "Delete failed",
+              });
+            }}
+            onShare={
+              !contextMenu.item.isPublic
+                ? () => {
+                    // TODO: Implement share functionality
+                    toast.success(
+                      `"${contextMenu.item!.name}" shared successfully!`,
+                    );
+                  }
+                : undefined
+            }
+            onHide={
+              contextMenu.item.isPublic
+                ? () => {
+                    // TODO: Implement hide functionality
+                    toast.success(
+                      `"${contextMenu.item!.name}" is now private!`,
+                    );
+                  }
+                : undefined
+            }
+            onNavigate={
+              contextMenu.item.isFolder
+                ? () => {
+                    router.push(
+                      `/dashboard/${[...folderPath, encodeURIComponent(contextMenu.item!.name)].join("/")}`,
+                    );
+                  }
+                : undefined
+            }
+            onRename={() => {
+              // TODO: Implement rename functionality
+              toast.success("Rename functionality coming soon!");
+            }}
+          />
         )}
       </div>
     </>
