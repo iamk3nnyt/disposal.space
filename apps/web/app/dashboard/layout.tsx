@@ -396,6 +396,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [isMembershipModalOpen, setIsMembershipModalOpen] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const { validationModal, showValidationModal, hideValidationModal } =
     useValidationModal();
   const {
@@ -455,6 +456,69 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     }
 
     return "DS";
+  };
+
+  // Handle avatar upload
+  const handleAvatarUpload = async (file: File) => {
+    if (!user) {
+      toast.error("User not available");
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Please select a valid image file (JPG, PNG, GIF, or WebP)");
+      return;
+    }
+
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      toast.error("Image size must be less than 10MB");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+
+    try {
+      await user.setProfileImage({ file });
+      toast.success("Avatar updated successfully!");
+    } catch (error) {
+      console.error("Error updating avatar:", error);
+      toast.error("Failed to update avatar. Please try again.");
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  // Handle avatar click to trigger file upload
+  const handleAvatarClick = () => {
+    if (isUploadingAvatar) return;
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.style.display = "none";
+
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        await handleAvatarUpload(file);
+      }
+      // Clean up
+      document.body.removeChild(input);
+    };
+
+    // Add to DOM temporarily and trigger click
+    document.body.appendChild(input);
+    input.click();
   };
 
   // Get current folder name for sidebar title
@@ -866,11 +930,59 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               {/* Sidebar Header */}
               <div className="flex h-16 min-h-16 items-center border-b border-gray-200 px-4">
                 <div className="flex items-center space-x-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500">
-                    <span className="text-sm font-medium text-white">
-                      {getUserInitials()}
-                    </span>
-                  </div>
+                  <button
+                    onClick={handleAvatarClick}
+                    disabled={isUploadingAvatar}
+                    className={cn(
+                      "group relative flex h-8 w-8 items-center justify-center rounded-lg transition-all disabled:cursor-not-allowed disabled:opacity-50",
+                      user?.hasImage
+                        ? "bg-transparent hover:bg-gray-100"
+                        : "bg-green-500 hover:bg-green-600",
+                    )}
+                    title="Click to upload avatar"
+                  >
+                    {user?.hasImage ? (
+                      <img
+                        src={user.imageUrl}
+                        alt="Profile avatar"
+                        className="h-full w-full rounded-lg object-cover"
+                      />
+                    ) : (
+                      <span className="text-sm font-medium text-white">
+                        {getUserInitials()}
+                      </span>
+                    )}
+
+                    {/* Loading overlay */}
+                    {isUploadingAvatar && (
+                      <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50">
+                        <div className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent"></div>
+                      </div>
+                    )}
+
+                    {/* Hover overlay */}
+                    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/0 opacity-0 transition-all group-hover:bg-black/20 group-hover:opacity-100">
+                      <svg
+                        className="h-3 w-3 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                      </svg>
+                    </div>
+                  </button>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">
                       {getUserDisplayName()}
