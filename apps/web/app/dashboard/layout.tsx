@@ -912,7 +912,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     <div className="absolute top-full left-0 z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
                       <button
                         onClick={() => {
-                          triggerFileUpload(false);
+                          const currentFolderId =
+                            currentFolderPath.length === 0
+                              ? undefined
+                              : folderData?.folderId || undefined;
+                          triggerFileUpload(false, currentFolderId);
                           setIsUploadDropdownOpen(false);
                         }}
                         className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -922,7 +926,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                       </button>
                       <button
                         onClick={() => {
-                          triggerFileUpload(true);
+                          const currentFolderId =
+                            currentFolderPath.length === 0
+                              ? undefined
+                              : folderData?.folderId || undefined;
+                          triggerFileUpload(true, currentFolderId);
                           setIsUploadDropdownOpen(false);
                         }}
                         className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
