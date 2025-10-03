@@ -152,7 +152,7 @@ function HeaderActions({
 }) {
   const { selectedFiles, clearSelection } = useSelection();
   const itemOperations = useItemOperations();
-  const [isHeaderUploadDropdownOpen, setIsHeaderUploadDropdownOpen] =
+  const [isHeaderImportDropdownOpen, setIsHeaderImportDropdownOpen] =
     useState(false);
   const pathname = usePathname();
 
@@ -190,6 +190,19 @@ function HeaderActions({
     totalItems: allFiles.length,
   });
   const files = pagination.getPageItems(allFiles);
+
+  // Close import dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest(".import-dropdown")) {
+        setIsHeaderImportDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // File upload handler - now properly calls the parent's handleFileUpload
   const triggerFileUpload = (isFolder: boolean) => {
@@ -294,56 +307,55 @@ function HeaderActions({
       >
         Settings
       </Link>
-      {/* Header Upload Dropdown */}
-      <div className="upload-dropdown relative">
+      {/* Header Import Dropdown */}
+      <div className="import-dropdown relative">
         <button
           onClick={() =>
-            setIsHeaderUploadDropdownOpen(!isHeaderUploadDropdownOpen)
+            setIsHeaderImportDropdownOpen(!isHeaderImportDropdownOpen)
           }
           className="flex items-center space-x-1 rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-800"
         >
-          <span>Upload</span>
+          <span>Import</span>
           <ChevronDown
             className={cn(
               "h-3 w-3 transition-transform",
-              isHeaderUploadDropdownOpen && "rotate-180",
+              isHeaderImportDropdownOpen && "rotate-180",
             )}
           />
         </button>
 
-        {/* Header Dropdown Menu */}
-        {isHeaderUploadDropdownOpen && (
+        {/* Header Import Dropdown Menu */}
+        {isHeaderImportDropdownOpen && (
           <div className="absolute top-full right-0 z-10 mt-1 w-40 rounded-md border border-gray-200 bg-white shadow-lg">
             <button
               onClick={() => {
-                triggerFileUpload(false);
-                setIsHeaderUploadDropdownOpen(false);
+                // TODO: Implement Google Drive import
+                toast.success("Google Drive import coming soon!");
+                setIsHeaderImportDropdownOpen(false);
               }}
               className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             >
-              <File className="h-4 w-4" />
-              <span>Upload Files</span>
-            </button>
-            <button
-              onClick={() => {
-                triggerFileUpload(true);
-                setIsHeaderUploadDropdownOpen(false);
-              }}
-              className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              <FolderPlus className="h-4 w-4" />
-              <span>Upload Folder</span>
-            </button>
-            <hr className="my-1 border-gray-100" />
-            <button
-              onClick={() => {
-                handleCreateFolderClick();
-                setIsHeaderUploadDropdownOpen(false);
-              }}
-              className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              <Folder className="h-4 w-4" />
-              <span>Create Folder</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width={2500}
+                height={2166}
+                viewBox="0 0 1443.061 1249.993"
+                className="size-4"
+              >
+                <path
+                  fill="#3777e3"
+                  d="m240.525 1249.993 240.492-416.664h962.044l-240.514 416.664z"
+                />
+                <path
+                  fill="#ffcf63"
+                  d="M962.055 833.329h481.006L962.055 0H481.017z"
+                />
+                <path
+                  fill="#11a861"
+                  d="m0 833.329 240.525 416.664 481.006-833.328L481.017 0z"
+                />
+              </svg>
+              <span>Google Drive</span>
             </button>
           </div>
         )}
