@@ -11,7 +11,6 @@ import {
   AlertTriangle,
   ArrowUpDown,
   Download,
-  Eye,
   Folder,
   FolderX,
   Home,
@@ -204,9 +203,23 @@ export default function FolderNavigationPage({
                               {file.name}
                             </Link>
                           ) : (
-                            <span className="text-sm font-medium text-gray-900">
+                            <button
+                              onClick={() => {
+                                const previewPromise = itemOperations.preview(
+                                  file.id,
+                                );
+                                toast.promise(previewPromise, {
+                                  loading: `Opening preview for "${file.name}"...`,
+                                  success: `Preview opened for "${file.name}"`,
+                                  error: (err) =>
+                                    `Failed to preview "${file.name}": ${err instanceof Error ? err.message : "Preview failed"}`,
+                                });
+                              }}
+                              disabled={itemOperations.isDownloading}
+                              className="text-left text-sm font-medium text-gray-900 hover:text-green-600 disabled:opacity-50"
+                            >
                               {file.name}
-                            </span>
+                            </button>
                           )}
                         </div>
                       </td>
@@ -230,24 +243,6 @@ export default function FolderNavigationPage({
                       <td className="py-4">
                         {!file.isFolder && (
                           <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() => {
-                                const previewPromise = itemOperations.preview(
-                                  file.id,
-                                );
-                                toast.promise(previewPromise, {
-                                  loading: `Opening preview for "${file.name}"...`,
-                                  success: `Preview opened for "${file.name}"`,
-                                  error: (err) =>
-                                    `Failed to preview "${file.name}": ${err instanceof Error ? err.message : "Preview failed"}`,
-                                });
-                              }}
-                              disabled={itemOperations.isDownloading}
-                              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
-                              title="Preview file"
-                            >
-                              <Eye className="h-3 w-3" />
-                            </button>
                             <button
                               onClick={() => {
                                 const downloadPromise = itemOperations.download(

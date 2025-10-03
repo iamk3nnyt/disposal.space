@@ -35,6 +35,7 @@ export const items = pgTable("items", {
   mimeType: varchar("mime_type", { length: 255 }),
   filePath: varchar("file_path", { length: 500 }), // Storage path (null for folders)
   isDeleted: boolean("is_deleted").default(false).notNull(),
+  isPublic: boolean("is_public").default(false).notNull(), // Public sharing flag
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   deletedAt: timestamp("deleted_at"),
@@ -69,6 +70,7 @@ export type Item = {
   mimeType?: string | null;
   filePath?: string | null;
   isDeleted: boolean;
+  isPublic: boolean;
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null;
@@ -82,6 +84,7 @@ export type FileItem = {
   size: string; // formatted size
   lastModified: string; // formatted date
   isFolder: boolean;
+  isPublic: boolean;
   sizeBytes: number;
   children?: FileItem[];
 };
