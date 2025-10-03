@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  Download,
-  Edit3,
-  EyeOff,
-  FolderOpen,
-  Share,
-  Trash2,
-} from "lucide-react";
+import { Download, Edit3, FolderOpen, Share, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface ContextMenuProps {
@@ -25,7 +18,6 @@ interface ContextMenuProps {
   onDownload?: () => void;
   onDelete?: () => void;
   onShare?: () => void;
-  onHide?: () => void;
   onNavigate?: () => void;
   onRename?: () => void;
 }
@@ -39,7 +31,6 @@ export function ContextMenu({
   onDownload,
   onDelete,
   onShare,
-  onHide,
   onNavigate,
   onRename,
 }: ContextMenuProps) {
@@ -113,23 +104,14 @@ export function ContextMenu({
       <div className="py-1">
         {item.isFolder ? (
           <>
-            {/* Share/Hide option */}
-            {!item.isPublic && onShare && (
+            {/* Share option */}
+            {onShare && (
               <button
                 onClick={() => handleAction(onShare)}
                 className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               >
                 <Share className="h-4 w-4" />
                 <span>Share Folder</span>
-              </button>
-            )}
-            {item.isPublic && onHide && (
-              <button
-                onClick={() => handleAction(onHide)}
-                className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                <EyeOff className="h-4 w-4" />
-                <span>Hide Folder</span>
               </button>
             )}
             {onNavigate && (
@@ -163,23 +145,14 @@ export function ContextMenu({
           </>
         ) : (
           <>
-            {/* Share/Hide option */}
-            {!item.isPublic && onShare && (
+            {/* Share option */}
+            {onShare && (
               <button
                 onClick={() => handleAction(onShare)}
                 className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               >
                 <Share className="h-4 w-4" />
                 <span>Share</span>
-              </button>
-            )}
-            {item.isPublic && onHide && (
-              <button
-                onClick={() => handleAction(onHide)}
-                className="flex w-full items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                <EyeOff className="h-4 w-4" />
-                <span>Hide</span>
               </button>
             )}
             {onDownload && (

@@ -420,32 +420,15 @@ export default function FolderNavigationPage({
                   err instanceof Error ? err.message : "Delete failed",
               });
             }}
-            onShare={
-              !contextMenu.item.isPublic
-                ? () => {
-                    openShareModal({
-                      id: contextMenu.item!.id,
-                      name: contextMenu.item!.name,
-                      isFolder: contextMenu.item!.isFolder,
-                      isPublic: contextMenu.item!.isPublic,
-                    });
-                    closeContextMenu();
-                  }
-                : undefined
-            }
-            onHide={
-              contextMenu.item.isPublic
-                ? () => {
-                    openShareModal({
-                      id: contextMenu.item!.id,
-                      name: contextMenu.item!.name,
-                      isFolder: contextMenu.item!.isFolder,
-                      isPublic: contextMenu.item!.isPublic,
-                    });
-                    closeContextMenu();
-                  }
-                : undefined
-            }
+            onShare={() => {
+              openShareModal({
+                id: contextMenu.item!.id,
+                name: contextMenu.item!.name,
+                isFolder: contextMenu.item!.isFolder,
+                isPublic: contextMenu.item!.isPublic,
+              });
+              closeContextMenu();
+            }}
             onNavigate={
               contextMenu.item.isFolder
                 ? () => {
