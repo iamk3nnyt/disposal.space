@@ -4,11 +4,11 @@ import {
   ArrowRight,
   ArrowUpDown,
   ChevronRight,
-  Download,
   File,
   Folder,
   MoreHorizontal,
   Plus,
+  ScrollText,
   Search,
   Settings,
   Shield,
@@ -87,13 +87,13 @@ export default function Home() {
 
             {/* CTA Button */}
             <Link
-              href="/paper.pdf"
+              href="/white-paper.pdf"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 sm:space-x-2 sm:px-4"
             >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Download Paper</span>
+              <ScrollText className="h-4 w-4" />
+              <span className="hidden sm:inline">White Paper</span>
             </Link>
           </div>
         </div>
