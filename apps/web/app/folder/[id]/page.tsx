@@ -1,11 +1,13 @@
 "use client";
 
+import { Pagination } from "@/components/pagination";
 import { getFileIcon } from "@/lib/file-icons";
+import { usePagination } from "@/lib/hooks/use-pagination";
 import { formatFileSize } from "@/lib/utils";
 import { Download, Eye, Folder, Share2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -20,24 +22,56 @@ interface FileItem {
   sizeBytes: number;
 }
 
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  totalCount: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
 interface FolderResponse {
   folder: FileItem;
   children: FileItem[];
+  pagination: PaginationInfo;
   error?: string;
 }
 
 export default function SharedFolderPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const folderId = params.id as string;
   const [folder, setFolder] = useState<FileItem | null>(null);
   const [children, setChildren] = useState<FileItem[]>([]);
+  const [paginationInfo, setPaginationInfo] = useState<PaginationInfo | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Get pagination from URL
+  const currentPage = parseInt(searchParams.get("page") || "1", 10);
+  const itemsPerPage = 10;
+
+  // Setup pagination hook
+  const pagination = usePagination({
+    itemsPerPage,
+    totalItems: paginationInfo?.totalCount || 0,
+  });
 
   useEffect(() => {
     const fetchFolder = async () => {
       try {
-        const response = await fetch(`/api/public/folders/${folderId}`);
+        setLoading(true);
+        const url = new URL(
+          `/api/public/folders/${folderId}`,
+          window.location.origin,
+        );
+        url.searchParams.set("page", currentPage.toString());
+        url.searchParams.set("limit", itemsPerPage.toString());
+
+        const response = await fetch(url.toString());
         const data: FolderResponse = await response.json();
 
         if (!response.ok) {
@@ -46,6 +80,7 @@ export default function SharedFolderPage() {
 
         setFolder(data.folder);
         setChildren(data.children);
+        setPaginationInfo(data.pagination);
       } catch (error) {
         setError(
           error instanceof Error ? error.message : "Failed to load folder",
@@ -56,7 +91,7 @@ export default function SharedFolderPage() {
     };
 
     fetchFolder();
-  }, [folderId]);
+  }, [folderId, currentPage]);
 
   const handleDownloadFile = async (fileId: string, fileName: string) => {
     try {
@@ -225,7 +260,10 @@ export default function SharedFolderPage() {
               </h1>
               <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-500">
                 <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
-                  {children.length} {children.length === 1 ? "item" : "items"}
+                  {paginationInfo?.totalCount || children.length}{" "}
+                  {(paginationInfo?.totalCount || children.length) === 1
+                    ? "item"
+                    : "items"}
                 </span>
                 <span>Modified {folder.lastModified}</span>
               </div>
@@ -234,7 +272,7 @@ export default function SharedFolderPage() {
         </div>
 
         {/* Folder Contents */}
-        {children.length === 0 ? (
+        {(paginationInfo?.totalCount || children.length) === 0 ? (
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-12 text-center">
             <Folder className="mx-auto mb-4 h-12 w-12 text-gray-300" />
             <h3 className="mb-2 text-lg font-medium text-gray-900">
@@ -353,6 +391,22 @@ export default function SharedFolderPage() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {/* Pagination */}
+        {paginationInfo && paginationInfo.totalPages > 1 && (
+          <Pagination
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            hasNextPage={pagination.hasNextPage}
+            hasPreviousPage={pagination.hasPreviousPage}
+            onPageChange={pagination.goToPage}
+            onNextPage={pagination.goToNextPage}
+            onPreviousPage={pagination.goToPreviousPage}
+            totalItems={paginationInfo.totalCount}
+            startIndex={pagination.startIndex}
+            endIndex={pagination.endIndex}
+          />
         )}
 
         {/* Footer */}
