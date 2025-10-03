@@ -57,6 +57,7 @@ export async function GET() {
         clerkUserId: user.clerkUserId,
         email: user.email,
         name: user.name,
+        membership: user.membership,
         storageUsed: actualStorageUsed,
         storageLimit: user.storageLimit,
         storageUsedFormatted: formatFileSize(actualStorageUsed),

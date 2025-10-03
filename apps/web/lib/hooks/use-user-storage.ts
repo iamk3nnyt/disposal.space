@@ -8,6 +8,7 @@ export interface UserStorageDetails {
   clerkUserId: string;
   email?: string | null;
   name?: string | null;
+  membership: string;
   storageUsed: number;
   storageLimit: number;
   storageUsedFormatted: string;

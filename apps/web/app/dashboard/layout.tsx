@@ -1,5 +1,6 @@
 "use client";
 
+import { MembershipModal } from "@/components/membership-modal";
 import {
   FileProcessingProvider,
   useFileProcessing,
@@ -27,6 +28,7 @@ import {
   validateFilesBeforeUpload,
 } from "@/lib/hooks/use-upload-validation";
 import { useUserStorage } from "@/lib/hooks/use-user-storage";
+import { Membership } from "@/lib/types";
 import { cn, formatFileSize } from "@/lib/utils";
 import { useClerk, useUser } from "@clerk/nextjs";
 import {
@@ -393,6 +395,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [isUploadDropdownOpen, setIsUploadDropdownOpen] = useState(false);
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [isMembershipModalOpen, setIsMembershipModalOpen] = useState(false);
   const { validationModal, showValidationModal, hideValidationModal } =
     useValidationModal();
   const {
@@ -1120,9 +1123,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               )}
 
               {/* Usage Details */}
-              <div
+              <button
+                onClick={() => setIsMembershipModalOpen(true)}
                 className={cn(
-                  "sticky bottom-0 min-h-22 border-t border-gray-200 p-4",
+                  "sticky bottom-0 min-h-22 w-full border-t border-gray-200 p-4 text-left transition-colors hover:bg-gray-50",
                   pathname === "/dashboard/settings" && "mt-auto",
                 )}
               >
@@ -1147,7 +1151,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     <span>{storageData?.stats.totalItems || 0}</span>
                   </div>
                 </div>
-              </div>
+              </button>
             </div>
 
             {/* Main Content Area */}
@@ -1747,6 +1751,17 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       )}
+
+      {/* Membership Modal */}
+      <MembershipModal
+        isOpen={isMembershipModalOpen}
+        onClose={() => setIsMembershipModalOpen(false)}
+        currentMembership={
+          storageData?.user.membership === "premium"
+            ? Membership.PREMIUM
+            : Membership.FREE
+        }
+      />
     </div>
   );
 }

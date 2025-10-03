@@ -1,11 +1,15 @@
 import {
   bigint,
   boolean,
+  pgEnum,
   pgTable,
   timestamp,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+
+// Enums
+export const membershipEnum = pgEnum("membership", ["free", "premium"]);
 
 // Users Table - Stores user information and storage usage
 export const users = pgTable("users", {
@@ -13,6 +17,7 @@ export const users = pgTable("users", {
   clerkUserId: varchar("clerk_user_id", { length: 255 }).unique().notNull(),
   email: varchar("email", { length: 255 }),
   name: varchar("name", { length: 255 }),
+  membership: membershipEnum("membership").default("free").notNull(),
   storageUsed: bigint("storage_used", { mode: "number" }).default(0).notNull(),
   storageLimit: bigint("storage_limit", { mode: "number" })
     .default(16106127360)
@@ -47,12 +52,19 @@ export type InsertUser = typeof users.$inferInsert;
 export type SelectItem = typeof items.$inferSelect;
 export type InsertItem = typeof items.$inferInsert;
 
+// TypeScript enums for better type safety
+export enum Membership {
+  FREE = "free",
+  PREMIUM = "premium",
+}
+
 // Frontend-compatible types
 export type User = {
   id: string;
   clerkUserId: string;
   email?: string | null;
   name?: string | null;
+  membership: Membership;
   storageUsed: number;
   storageLimit: number;
   createdAt: Date;

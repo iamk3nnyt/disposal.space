@@ -3,15 +3,7 @@
 import { useUserStorage } from "@/lib/hooks/use-user-storage";
 import { cn } from "@/lib/utils";
 import { useUser } from "@clerk/nextjs";
-import {
-  BarChart3,
-  CreditCard,
-  Folder,
-  Key,
-  Mail,
-  Shield,
-  Trash2,
-} from "lucide-react";
+import { BarChart3, Folder, Key, Mail, Shield, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 interface SettingItem {
@@ -222,23 +214,6 @@ export default function SettingsPage() {
           value: isLoadingStorage
             ? "..."
             : `${storageData?.user.storageAvailableFormatted || "15 GB"} available`,
-        },
-      ],
-    },
-    {
-      title: "Billing & Subscription",
-      settings: [
-        {
-          id: "billing",
-          icon: <CreditCard className="h-5 w-5" />,
-          title: "Manage Billing",
-          description:
-            "View invoices, update payment methods, and manage your subscription",
-          type: "button",
-          action: "Open Billing Portal",
-          href:
-            process.env.NEXT_PUBLIC_STRIPE_BILLING_URL ||
-            "https://billing.stripe.com/p/login/00w6oI7TX5Pf4UWc2X4gg00",
         },
       ],
     },
