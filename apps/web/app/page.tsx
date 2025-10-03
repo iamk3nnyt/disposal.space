@@ -317,7 +317,7 @@ export default function Home() {
                             Settings
                           </button>
                           <button className="rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-800">
-                            Upload
+                            Import
                           </button>
                         </div>
                       </div>
