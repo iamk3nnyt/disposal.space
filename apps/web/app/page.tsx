@@ -309,7 +309,7 @@ export default function Home() {
                       <div className="flex h-16 w-full items-center justify-between border-b border-gray-200 px-6">
                         <div className="flex items-center">
                           <h2 className="text-base font-medium text-gray-900">
-                            Dashboard
+                            Root
                           </h2>
                         </div>
                         <div className="flex items-center space-x-3">

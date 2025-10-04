@@ -113,7 +113,7 @@ function HeaderTitle() {
     return (
       <nav className="flex items-center space-x-2 text-sm">
         <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">
-          Dashboard
+          Root
         </Link>
         {currentFolderPath.map((segment, index) => {
           const isLast = index === currentFolderPath.length - 1;
@@ -141,7 +141,7 @@ function HeaderTitle() {
     );
   }
 
-  return <h2 className="text-base font-medium text-gray-900">Dashboard</h2>;
+  return <h2 className="text-base font-medium text-gray-900">Root</h2>;
 }
 
 // Header Actions Component (Right side - Settings/Upload or Download/Delete)
@@ -524,7 +524,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   // Get current folder name for sidebar title
   const getCurrentFolderName = () => {
     if (pathname === "/dashboard") {
-      return "DASHBOARD";
+      return "ROOT";
     }
 
     // Extract folder name from pathname like /dashboard/folder1/folder2
@@ -536,7 +536,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       return decodedName.toUpperCase();
     }
 
-    return "DASHBOARD";
+    return "ROOT";
   };
 
   // Determine overall loading state
