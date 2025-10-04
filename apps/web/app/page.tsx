@@ -220,7 +220,7 @@ export default function Home() {
                       {/* File Tree */}
                       <div className="px-4 py-2">
                         <div className="mb-3 text-xs font-medium tracking-wider text-gray-400 uppercase">
-                          DISPOSED
+                          ROOT
                         </div>
                         <div className="space-y-0.5">
                           <div className="flex cursor-pointer items-center space-x-2 rounded-md bg-gray-200 px-2 py-1 text-sm text-gray-900">
